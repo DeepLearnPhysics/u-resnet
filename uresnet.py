@@ -102,8 +102,8 @@ def build(input_tensor, num_class=4):
     print(net.shape, "should be 512 512 64")
 
     # second of two 7x7 conv at the end
-    net = L.conv2d(input_tensor=net, name='conv7x7_end2', kernel=(7,7), stride=(1,1), num_filter=3, activation_fn=tf.nn.relu)
-    print(net.shape, "should be 512 512 3")
+    net = L.conv2d(input_tensor=net, name='conv7x7_end2', kernel=(7,7), stride=(1,1), num_filter=num_class, activation_fn=tf.nn.relu)
+    print(net.shape, "should be 512 512 num_class")
 
     return net
 
