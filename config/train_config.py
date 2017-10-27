@@ -1,18 +1,22 @@
-import os, sys, uresnet
+import os, sys
 
 class config:
 
     def __init__(self):
+        self.TRAIN      = True
         self.DEBUG      = False
-        self.NUM_CLASS  = 4
         self.ITERATIONS = 1000
         self.BATCH_SIZE = 100
-        self.SAVE_ITERATION = 10
-        self.ARCHITECTURE = 'lenet'
+        self.SAVE_ITERATION = 100
+        self.STORAGE_KEY_DATA = ''
+        self.STORAGE_KEY_LABEL = ''
+        self.STORAGE_KEY_WEIGHT = ''
         self.LOGDIR         = 'logs'
+        self.ARCHITECTURE   = 'lenet'
         self.LOAD_FILE      = ''
         self.AVOID_LOAD_PARAMS = ''
         self.FILLER_CONFIG = ''
+        self.NUM_CLASS = 0
     def parse(self,argv_v):
 
         cfg_file=None
@@ -22,9 +26,7 @@ class config:
 
         for argv in argv_v:
             try:
-                if   argv.startswith('num_class='):
-                    self.NUM_CLASS = int(argv.replace('num_class=',''))
-                elif argv.startswith('batch='):
+                if argv.startswith('batch='):
                     self.BATCH_SIZE = int(argv.replace('batch=',''))
                 elif argv.startswith('iterations='):
                     self.ITERATIONS = int(argv.replace('iterations=',''))
@@ -42,6 +44,16 @@ class config:
                     self.AVOID_LOAD_PARAMS = argv.replace('avoid_params=','')
                 elif argv.startswith('filler='):
                     self.FILLER_CONFIG = argv.replace('filler=','')
+                elif argv.startswith('train='):
+                    self.TRAIN = int(argv.replace('train=',''))
+                elif argv.startswith('key_data='):
+                    self.STORAGE_KEY_DATA = argv.replace('key_data=','')
+                elif argv.startswith('key_label='):
+                    self.STORAGE_KEY_LABEL = argv.replace('key_label=','')
+                elif argv.startswith('key_weight='):
+                    self.STORAGE_KEY_WEIGHT = argv.replace('key_weight=','')
+                elif argv.startswith('num_class='):
+                    self.NUM_CLASS = int(argv.replace('num_class=',''))
             except Exception:
                 print 'argument:',argv,'not in a valid format (parsing failed!)'
                 return False
@@ -87,7 +99,7 @@ class config:
                     return False
         # network availability
         try:
-            cmd = 'from toynet import toy_%s' % self.ARCHITECTURE
+            cmd = 'from models import %s' % self.ARCHITECTURE
             exec(cmd)
         except Exception:
             print 'Architecture',self.ARCHITECTURE,'is not available...'
@@ -97,7 +109,11 @@ class config:
         
     def __str__(self):
         msg  = 'Configuration parameters:\n'
+        msg += '    train              = %d\n' % self.TRAIN
         msg += '    class count        = %d\n' % self.NUM_CLASS
+        msg += '    data keyword       = %s\n' % self.STORAGE_KEY_DATA
+        msg += '    label keyword      = %s\n' % self.STORAGE_KEY_LABEL
+        msg += '    weight keyword     = %s\n' % self.STORAGE_KEY_WEIGHT
         msg += '    batch size         = %d\n' % self.BATCH_SIZE
         msg += '    iterations         = %d\n' % self.ITERATIONS
         msg += '    log directory      = %s\n' % self.LOGDIR
@@ -110,6 +126,6 @@ class config:
 
 if __name__ == '__main__':
     import sys
-    cfg = config()
+    cfg = toy_config()
     cfg.parse(sys.argv)
     print cfg

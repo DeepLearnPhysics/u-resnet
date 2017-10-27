@@ -25,7 +25,7 @@ sess = tf.InteractiveSession()
 data_tensor    = tf.placeholder(tf.float32,  [None, 262144],name='x')
 data_tensor_2d = tf.reshape(data_tensor,[-1,512,512,1])
 label_tensor   = tf.placeholder(tf.float32, [None, cfg.NUM_CLASS],name='labels')
-
+weight_tensor  = tf.placeholder(tf.float32, [None,512*512])
 #RESHAPE IMAGE IF NEED BE                                                     
 tf.summary.image('input',data_tensor_2d,10)
 
@@ -34,7 +34,8 @@ net = uresnet
 cmd = 'import uresnet; net=uresnet.build(data_tensor_2d, num_classes=cfg.NUM_CLASS)'
 exec(cmd)
 
-#FC layer
+#Reshape
+net = tf.reshape(net, [-1,cfg.NUM_CLASS])
 
 #SOFTMAX
 with tf.name_scope('softmax'):
@@ -42,7 +43,9 @@ with tf.name_scope('softmax'):
 
 #CROSS-ENTROPY
 with tf.name_scope('cross_entropy'):
-  cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=label_tensor, logits=net))
+  loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_tensor, logits=tf.argmax(net,1))
+  weighted_loss = tf.multiply(loss,weight_tensor)
+  cross_entropy = tf.reduce_mean(weighted_loss)
   tf.summary.scalar('cross_entropy',cross_entropy)
 
 #TRAINING (RMS OR ADAM-OPTIMIZER OPTIONAL)                                    
@@ -51,7 +54,7 @@ with tf.name_scope('train'):
 
 #ACCURACY                                                                     
 with tf.name_scope('accuracy'):
-  correct_prediction = tf.equal(tf.argmax(net,1), tf.argmax(label_tensor,1))
+  correct_prediction = tf.equal(tf.argmax(net,1), label_tensor,1)
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
   tf.summary.scalar('accuracy', accuracy)
 

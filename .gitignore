@@ -29,3 +29,8 @@
 *.pdf
 *.o
 larcv
+*.index
+*.data*
+*.meta
+checkpoint
+log_ssnet
