@@ -21,19 +21,6 @@
 *.txt
 *.bin
 *.root
-build
-app/PlayGround/*
-app/Supera/APILArLite/Cropper.*
-app/Supera/APILArLite/MCParticleTree.*
-app/Supera/APILArLite/SuperaTypes.h
-app/Supera/APILArLite/SuperaUtils.*
-app/Supera/APILArLite/SuperaCore.*
-app/Supera/APILArSoft/Cropper.*
-app/Supera/APILArSoft/MCParticleTree.*
-app/Supera/APILArSoft/SuperaTypes.h
-app/Supera/APILArSoft/SuperaUtils.*
-app/Supera/APILArSoft/SuperaCore.*
-app/Supera/APILArSoft/supera.fcl
 *~
 *.pyc
 .ipynb_checkpoints
@@ -41,3 +28,4 @@ app/Supera/APILArSoft/supera.fcl
 .DS_Store
 *.pdf
 *.o
+larcv
