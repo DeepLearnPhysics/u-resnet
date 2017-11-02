@@ -11,15 +11,18 @@ from libs.uresnet import uresnet
 from larcv import larcv
 from larcv.dataloader2 import larcv_threadio
 
-TRAIN             = True
 NUM_CLASS         = 3
 BASE_NUM_FILTERS  = 16
 FILLER_CONFIG     = 'config/train_io.cfg'
 LOGDIR            = 'ssnet_train_log'
+SAVE_FILE         = 'ssnet_checkpoint/uresnet'
 LOAD_FILE         = ''
 AVOID_LOAD_PARAMS = []
 BATCH_SIZE        = 10
 ITERATIONS        = 100000
+
+TRAIN             = True
+NORMALIZE_WEIGHTS = False
 CHECKPOINT_STEPS  = 200
 SUMMARY_STEPS     = 20
 KEYWORD_DATA      = 'data'
@@ -94,19 +97,21 @@ for i in range(ITERATIONS):
   # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
   batch_data   = proc.fetch_data(KEYWORD_DATA).data()
   batch_label  = proc.fetch_data(KEYWORD_LABEL).data()
-  batch_weight = proc.fetch_data(KEYWORD_WEIGHT).data()
-  
-  # perform per-event normalization
-  batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
-
+  batch_weight = None
   # Start IO thread for the next batch while we train the network
   if TRAIN:
+    batch_weight = proc.fetch_data(KEYWORD_WEIGHT).data()
+    proc.next()
+    # perform per-event normalization
+    if NORMALIZE_WEIGHTS:
+      batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
     _,loss,acc_all,acc_nonzero = net.train(sess         = sess, 
                                            input_image  = batch_data,
                                            input_label  = batch_label,
                                            input_weight = batch_weight)
     sys.stdout.write('Training in progress @ step %d loss %g accuracy %g / %g           \r' % (i,loss,acc_all,acc_nonzero))
   else:
+    proc.next()
     softmax,acc_all,acc_nonzero = net.train(sess        = sess,
                                             input_image = batch_data,
                                             input_label = batch_label)
@@ -125,7 +130,7 @@ for i in range(ITERATIONS):
   # If configured to save summary + snapshot, do so here.
   if TRAIN and (i+1)%CHECKPOINT_STEPS == 0:
     # Save snapshot
-    ssf_path = saver.save(sess,'ssnet',global_step=i)
+    ssf_path = saver.save(sess,SAVE_FILE,global_step=i)
     print
     print 'saved @',ssf_path
 
