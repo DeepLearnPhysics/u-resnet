@@ -14,7 +14,9 @@ class ssnet_config:
     AVOID_LOAD_PARAMS = []
     BATCH_SIZE        = 10
     ITERATIONS        = 100000
-    
+
+    DUMP_IMAGE        = True
+
     TRAIN             = True
     NORMALIZE_WEIGHTS = False
     CHECKPOINT_STEPS  = 200
