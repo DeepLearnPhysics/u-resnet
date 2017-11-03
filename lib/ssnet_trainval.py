@@ -1,26 +1,34 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 # Basic imports
 import os,sys,time
-#import matplotlib
-#matplotlib.use('Agg')
-#import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import numpy as np
-#from mpl_toolkits.mplot3d import Axes3D
+
 # Import more libraries (after configuration is validated)
 import tensorflow as tf
-from libs.uresnet import uresnet
+from uresnet import uresnet
 from larcv import larcv
 from larcv.dataloader2 import larcv_threadio
 from config import ssnet_config
 
-class train_ssnet(object):
+class ssnet_trainval(object):
 
   def __init__(self):
     self._cfg = ssnet_config()
     self._filler = None
+    self._iteration = -1
 
   def __del__(self):
     if self._filler:
       self._filler.reset()
+
+  def iteration_from_file_name(self,file_name):
+    return int((file_name.split('-'))[-1])
 
   def override_config(self,file_name):
     self._cfg.override(file_name)
@@ -56,6 +64,8 @@ class train_ssnet(object):
     else:
       self._net.construct(trainable=self._cfg.TRAIN,use_weight=False)
 
+    self._iteration = 0
+
   def run(self,sess):
     # Configure global process (session, summary, etc.)
     # Create a bandle of summary
@@ -77,17 +87,21 @@ class train_ssnet(object):
     # Override variables if wished
     if self._cfg.LOAD_FILE:
       vlist=[]
+      self._iteration = self.iteration_from_file_name(self._cfg.LOAD_FILE)
       for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
         if v.name in self._cfg.AVOID_LOAD_PARAMS:
-          print '\033[91mSkipping\033[00m loading variable',v.name,'from input weight...'
+          print('\033[91mSkipping\033[00m loading variable',v.name,'from input weight...')
           continue
-        print '\033[95mLoading\033[00m variable',v.name,'from',self._cfg.LOAD_FILE
+        print('\033[95mLoading\033[00m variable',v.name,'from',self._cfg.LOAD_FILE)
         vlist.append(v)
         reader=tf.train.Saver(var_list=vlist)
         reader.restore(sess,self._cfg.LOAD_FILE)
     
     # Run iterations
-    for i in range(self._cfg.ITERATIONS):
+    for i in xrange(self._cfg.ITERATIONS):
+      if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
+        print('Finished training (iteration %d)' % self._iteration)
+        break
   
       # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
       batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
@@ -105,29 +119,55 @@ class train_ssnet(object):
                                                      input_image  = batch_data,
                                                      input_label  = batch_label,
                                                      input_weight = batch_weight)
-        sys.stdout.write('Training in progress @ step %d loss %g accuracy %g / %g           \r' % (i,loss,acc_all,acc_nonzero))
+        self._iteration += 1
+        msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
+        msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
+        sys.stdout.write(msg)
+        sys.stdout.flush()
       else:
         self._filler.next()
-        softmax,acc_all,acc_nonzero = self._net.train(sess        = sess,
-                                                      input_image = batch_data,
-                                                      input_label = batch_label)
-        sys.stdout.write('Training in progress @ step %d accuracy %g / %g                   \r' % (i,acc_all,acc_nonzero))
+        softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
+                                                          input_image = batch_data,
+                                                          input_label = batch_label)
 
-      sys.stdout.flush()
+        print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
-      # Save log every 20 steps
-      if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((i+1)%self._cfg.SUMMARY_STEPS) == 0:
+        if False:
+          for image_index in xrange(len(softmax)):
+            event_image = softmax[image_index]
+            bg_image = event_image[:,:,0]
+            track_image = event_image[:,:,1]
+            shower_image = event_image[:,:,2]
+            bg_image_name = 'SOFTMAX_BG_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            track_image_name = 'SOFTMAX_TRACK_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            shower_image_name = 'SOFTMAX_SHOWER_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((bg_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(bg_image_name)
+            plt.close()
+
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((shower_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(shower_image_name)
+            plt.close()
+            
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
+            plt.close()
+
+
+      # Save log
+      if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
         feed_dict = self._net.feed_dict(input_image  = batch_data,
                                         input_label  = batch_label,
                                         input_weight = batch_weight)
-        writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),i)
+        writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
   
-      # If configured to save summary + snapshot, do so here.
-      if self._cfg.TRAIN and self._cfg.CHECKPOINT_STEPS and ((i+1)%self._cfg.CHECKPOINT_STEPS) == 0:
+      # Save snapshot
+      if self._cfg.TRAIN and self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
         # Save snapshot
-        ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=i)
-        print
-        print 'saved @',ssf_path
+        ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
+        print()
+        print('saved @',ssf_path)
 
 

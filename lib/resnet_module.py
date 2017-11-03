@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 import numpy as np
 import tensorflow.python.platform
 import tensorflow as tf
@@ -32,10 +35,11 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
         #
         # residual path
         #
-        residual = L.batch_norm(inputs     = input_tensor, 
-                                epsilon    = 0.00001,
-                                activation_fn = tf.nn.relu,
-                                scope      = 'resnet_bn1')
+        #residual = L.batch_norm(inputs     = input_tensor, 
+        #                        epsilon    = 0.00001,
+        #                        activation_fn = tf.nn.relu,
+        #                        scope      = 'resnet_bn1',
+        #                        trainable  = trainable)
         residual = slim.conv2d(inputs      = residual,
                                num_outputs = num_outputs,
                                kernel_size = kernel,
@@ -45,10 +49,11 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
                                activation_fn = None,
                                scope       = 'resnet_conv1')
 
-        residual = L.batch_norm(inputs     = residual, 
-                                epsilon    = 0.00001,
-                                activation_fn = tf.nn.relu,
-                                scope      = 'resnet_bn2')
+        #residual = L.batch_norm(inputs     = residual, 
+        #                        epsilon    = 0.00001,
+        #                        activation_fn = tf.nn.relu,
+        #                        scope      = 'resnet_bn2',
+        #                        trainable  = trainable)
         residual = slim.conv2d(inputs      = residual,
                                num_outputs = num_outputs,
                                kernel_size = kernel,

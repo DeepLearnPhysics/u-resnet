@@ -1,3 +1,7 @@
+from __future__ import absolute_import
+#from __future__ import division
+from __future__ import print_function
+
 import numpy as np
 import tensorflow.python.platform
 import tensorflow as tf
@@ -54,21 +58,22 @@ class uresnet(ssnet_base):
                 conv_feature_map[net.get_shape()[-1].value] = net
             # Decoding steps
             for step in xrange(self._num_strides):
-                net = L.conv2d_transpose(inputs      = net,
-                                         num_outputs = net.get_shape()[-1].value / 2,
-                                         kernel_size = [3,3],
-                                         stride      = 2,
-                                         padding     = 'same',
-                                         activation_fn = None,
-                                         trainable   = self._trainable,
-                                         scope       = 'deconv%d' % step)
+                num_outputs = net.get_shape()[-1].value / 2
+                net = slim.conv2d_transpose(inputs      = net,
+                                            num_outputs = num_outputs,
+                                            kernel_size = [3,3],
+                                            stride      = 2,
+                                            padding     = 'same',
+                                            activation_fn = None,
+                                            trainable   = self._trainable,
+                                            scope       = 'deconv%d' % step)
                 if self._debug: print(net.shape, 'after deconv%d' % step)                    
-                net = tf.concat([net, conv_feature_map[net.get_shape()[-1].value]],
+                net = tf.concat([net, conv_feature_map[num_outputs]],
                                 axis=3, 
                                 name='concat%d' % step)
                 if self._debug: print(net.shape, 'after concat%d' % step)
                 net = double_resnet(input_tensor = net, 
-                                    num_outputs  = net.get_shape()[-1].value / 2,
+                                    num_outputs  = num_outputs,
                                     trainable    = self._trainable,
                                     kernel       = [3,3],
                                     stride       = 1,
