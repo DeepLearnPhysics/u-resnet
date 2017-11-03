@@ -35,7 +35,8 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
         #
         # residual path
         #
-        #residual = L.batch_norm(inputs     = input_tensor, 
+        residual = input_tensor
+        #residual = L.batch_norm(inputs     = residual,
         #                        epsilon    = 0.00001,
         #                        activation_fn = tf.nn.relu,
         #                        scope      = 'resnet_bn1',
