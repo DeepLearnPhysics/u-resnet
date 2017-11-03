@@ -88,14 +88,19 @@ class ssnet_trainval(object):
     if self._cfg.LOAD_FILE:
       vlist=[]
       self._iteration = self.iteration_from_file_name(self._cfg.LOAD_FILE)
-      for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
+      parent_vlist = []
+      if self._cfg.TRAIN: 
+        parent_vlist = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+      else:
+        parent_vlist = tf.get_collection(tf.GraphKeys.MODEL_VARIABLES)
+      for v in parent_vlist:
         if v.name in self._cfg.AVOID_LOAD_PARAMS:
           print('\033[91mSkipping\033[00m loading variable',v.name,'from input weight...')
           continue
         print('\033[95mLoading\033[00m variable',v.name,'from',self._cfg.LOAD_FILE)
         vlist.append(v)
-        reader=tf.train.Saver(var_list=vlist)
-        reader.restore(sess,self._cfg.LOAD_FILE)
+      reader=tf.train.Saver(var_list=vlist)
+      reader.restore(sess,self._cfg.LOAD_FILE)
     
     # Run iterations
     for i in xrange(self._cfg.ITERATIONS):
