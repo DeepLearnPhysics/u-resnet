@@ -59,8 +59,9 @@ class ssnet_base(object):
           self._loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net))
         
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
-        self._apply_gradients = tf.train.RMSPropOptimizer(0.0003).apply_gradients([(self._accum_vars[i],
-                                                              tv) for i, tv in enumerate(tf.trainable_variables())])
+        self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
+                                 i, gv in enumerate(tf.train.RMSPropOptimizer(0.0003).compute_gradients(loss))]
+        self._apply_gradients = tf.train.RMSPropOptimizer(0.0003).apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
         tf.summary.image('data_example',image_nhwc,10)
         tf.summary.scalar('accuracy_all', self._accuracy_allpix)
         tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
@@ -75,11 +76,7 @@ class ssnet_base(object):
                                input_label  = input_label,
                                input_weight = input_weight)
     
-    with tf.variable_scope('accum_grad'):
-      gradients = tf.train.RMSPropOptimizer(0.0003).compute_gradients(self._loss, tf.trainable_variables())
-      self._accumulate = [self._accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(gradients)]
-    
-    return sess.run([self._accumulate], feed_dict = feed_dict )
+    return sess.run([self._accum_gradients], feed_dict = feed_dict )
 
   def apply_gradients(self,sess,input_image,input_label,input_weight=None):
 
