@@ -38,8 +38,9 @@ class ssnet_base(object):
     self._loss    = None
     self._accuracy_allpix = None
     self._accuracy_nonzero = None
-    self._accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()),
-                                          trainable=False) for tv in tf.trainable_variables()]
+    with tf.variable_scope('accum_grad'):
+      self._accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()),
+                                      trainable=False) for tv in tf.trainable_variables()]
 
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,3), label_nhw),tf.float32))
@@ -73,10 +74,9 @@ class ssnet_base(object):
     feed_dict = self.feed_dict(input_image  = input_image,
                                input_label  = input_label,
                                input_weight = input_weight)
-
-    gradients = tf.train.RMSPropOptimizer(0.0003).compute_gradients(self._loss, tf.trainable_variables())
-
-    with tf.variable_scope('train'):
+    
+    with tf.variable_scope('accum_grad'):
+      gradients = tf.train.RMSPropOptimizer(0.0003).compute_gradients(self._loss, tf.trainable_variables())
       self._accumulate = [self._accum_vars[i].assign_add(gv[0]) for i, gv in enumerate(gradients)]
     
     return sess.run([self._accumulate], feed_dict = feed_dict )
