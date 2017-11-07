@@ -127,11 +127,13 @@ class ssnet_trainval(object):
                           input_image = batch_data[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
                           input_label = batch_label[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
                           input_weight = batch_weight[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:])
+          print("minibatch done")
 
         _, loss, acc_all, acc_nonzero = self._net.apply_gradients(sess = sess,
                                                                   input_image  = batch_data,
                                                                   input_label  = batch_label,
                                                                   input_weight = batch_weight)
+        print("batch done")
         self._iteration += 1
         msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
         msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
