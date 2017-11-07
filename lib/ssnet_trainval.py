@@ -46,7 +46,7 @@ class ssnet_trainval(object):
                   'filler_cfg'  : self._cfg.FILLER_CONFIG}
     self._filler.configure(filler_cfg)
     # Start IO thread
-    self._filler.start_manager(self._cfg.BATCH_SIZE)
+    self._filler.start_manager(self._cfg.MINIBATCH_SIZE*self._cfg.NUM_MINIBATCHES)
     # Storage ID
     storage_id=0
     # Retrieve image/label dimensions
@@ -102,7 +102,6 @@ class ssnet_trainval(object):
       reader=tf.train.Saver(var_list=vlist)
       reader.restore(sess,self._cfg.LOAD_FILE)
     
-    # Run iterations
     for i in xrange(self._cfg.ITERATIONS):
       if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
         print('Finished training (iteration %d)' % self._iteration)
@@ -112,6 +111,7 @@ class ssnet_trainval(object):
       batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
       batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
       batch_weight = None
+
       # Start IO thread for the next batch while we train the network
       if self._cfg.TRAIN:
         batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
@@ -119,11 +119,21 @@ class ssnet_trainval(object):
         # perform per-event normalization
         if self._cfg.NORMALIZE_WEIGHTS:
           batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
-    
-        _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
-                                                     input_image  = batch_data,
-                                                     input_label  = batch_label,
-                                                     input_weight = batch_weight)
+        
+        self._net.zero_gradients(sess = sess)
+        
+        for j in range(self._cfg.NUM_MINIBATCHES):
+          self._net.accum_gradients(sess = sess,
+                          input_image = batch_data[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
+                          input_label = batch_label[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
+                          input_weight = batch_weight[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:])
+          print("minibatch done")
+
+        _, loss, acc_all, acc_nonzero = self._net.apply_gradients(sess = sess,
+                                                                  input_image  = batch_data,
+                                                                  input_label  = batch_label,
+                                                                  input_weight = batch_weight)
+        print("batch done")
         self._iteration += 1
         msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
         msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
