@@ -137,7 +137,7 @@ class ssnet_trainval(object):
 
         print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
-        if self._cfg.DUMP_IMAGE:
+        if False:
           for image_index in xrange(len(softmax)):
             event_image = softmax[image_index]
             bg_image = event_image[:,:,0]
