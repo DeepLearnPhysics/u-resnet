@@ -13,8 +13,6 @@ class ssnet_config:
     LOAD_FILE         = ''
     AVOID_LOAD_PARAMS = []
     BATCH_SIZE        = 10
-    MINIBATCH_SIZE    = 2
-    NUM_MINIBATCHES   = 3
     ITERATIONS        = 100000
 
     DUMP_IMAGE        = True
