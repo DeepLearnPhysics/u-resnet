@@ -49,12 +49,11 @@ class ssnet_base(object):
 
     if self._trainable:
       with tf.variable_scope('train'):
+        self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net)
         if self._use_weight:
-          loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net)
-          self._loss = tf.reduce_mean(tf.multiply(weight_nhw, loss))
-        else:
-          self._loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net))
-        self._train = tf.train.RMSPropOptimizer(0.0003).minimize(loss)
+          self._loss = tf.multiply(weight_nhw,self._loss)
+        self._train = tf.train.RMSPropOptimizer(0.0003).minimize(self._loss)
+        self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1,self._rows*self._cols]),axis=1))
 
         tf.summary.image('data_example',image_nhwc,10)
         tf.summary.scalar('accuracy_all', self._accuracy_allpix)

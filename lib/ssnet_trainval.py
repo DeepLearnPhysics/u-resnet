@@ -60,9 +60,9 @@ class ssnet_trainval(object):
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=True)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=False)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
 
     self._iteration = 0
 
@@ -114,11 +114,11 @@ class ssnet_trainval(object):
       batch_weight = None
       # Start IO thread for the next batch while we train the network
       if self._cfg.TRAIN:
-        batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+        if self._cfg.USE_WEIGHTS:
+          batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+          # perform per-event normalization
+          batch_weight /= (np.sum(batch_weight,axis=1).reshape([batch_weight.shape[0],1]))
         self._filler.next()
-        # perform per-event normalization
-        if self._cfg.NORMALIZE_WEIGHTS:
-          batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
     
         _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
                                                      input_image  = batch_data,

@@ -18,7 +18,7 @@ class ssnet_config:
     DUMP_IMAGE        = True
 
     TRAIN             = True
-    NORMALIZE_WEIGHTS = False
+    USE_WEIGHTS       = True
     CHECKPOINT_STEPS  = 200
     SUMMARY_STEPS     = 20
     KEYWORD_DATA      = 'data'
