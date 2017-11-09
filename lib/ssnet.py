@@ -27,8 +27,7 @@ class ssnet_base(object):
       
       image_nhwc = tf.reshape(self._input_image, [-1,self._rows,self._cols,1], name='image_reshape' )
       label_nhw  = tf.reshape(self._input_label, [-1,self._rows,self._cols  ], name='label_reshape' )
-      weight_nhw = tf.reshape(self._input_label, [-1,self._rows,self._cols  ], name='weight_reshape')
-
+      weight_nhw = tf.reshape(self._input_weight, [-1,self._rows,self._cols  ], name='weight_reshape')
       label_nhw = tf.cast(label_nhw,tf.int64)
       
     net = self._build(input_tensor=image_nhwc)
