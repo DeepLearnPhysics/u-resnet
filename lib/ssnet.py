@@ -57,11 +57,11 @@ class ssnet_base(object):
           self._loss = tf.reduce_mean(tf.multiply(weight_nhw, loss))
         else:
           self._loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net))
-        
+        opt = tf.train.AdamOptimizer(0.0003)
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
         self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
-                                 i, gv in enumerate(tf.train.RMSPropOptimizer(0.0003).compute_gradients(loss))]
-        self._apply_gradients = tf.train.RMSPropOptimizer(0.0003).apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
+                                 i, gv in enumerate(opt.compute_gradients(self._loss))]
+        self._apply_gradients = opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
         tf.summary.image('data_example',image_nhwc,10)
         tf.summary.scalar('accuracy_all', self._accuracy_allpix)
         tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
@@ -76,17 +76,11 @@ class ssnet_base(object):
                                input_label  = input_label,
                                input_weight = input_weight)
     
-    return sess.run([self._accum_gradients], feed_dict = feed_dict )
+    return sess.run([self._accum_gradients, self._loss, self._accuracy_allpix, self._accuracy_nonzero], feed_dict = feed_dict )
 
-  def apply_gradients(self,sess,input_image,input_label,input_weight=None):
+  def apply_gradients(self,sess):
 
-    feed_dict = self.feed_dict(input_image  = input_image,
-                               input_label  = input_label,
-                               input_weight = input_weight)
-    
-    ops = [self._apply_gradients,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
-
-    return sess.run( ops, feed_dict = feed_dict )
+    return sess.run( [self._apply_gradients], feed_dict = {} )
 
   def inference(self,sess,input_image,input_label=None):
     

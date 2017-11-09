@@ -46,7 +46,7 @@ class ssnet_trainval(object):
                   'filler_cfg'  : self._cfg.FILLER_CONFIG}
     self._filler.configure(filler_cfg)
     # Start IO thread
-    self._filler.start_manager(self._cfg.MINIBATCH_SIZE*self._cfg.NUM_MINIBATCHES)
+    self._filler.start_manager(self._cfg.MINIBATCH_SIZE)
     # Storage ID
     storage_id=0
     # Retrieve image/label dimensions
@@ -106,74 +106,40 @@ class ssnet_trainval(object):
       if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
         print('Finished training (iteration %d)' % self._iteration)
         break
-  
-      # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
-      batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
-      batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
-      batch_weight = None
+      self._net.zero_gradients(sess = sess)
+      batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,3))
+      for j in xrange(self._cfg.NUM_MINIBATCHES):
+        minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
+        minibatch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
+        minibatch_weight = None
+        if self._cfg.TRAIN:
+          minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+          self._filler.next()
+          # perform per-event normalization                                                                                                  
+          if self._cfg.NORMALIZE_WEIGHTS:
+            minibatch_weight /= np.mean(minibatch_weight,axis=1, keepdims=True)
 
-      # Start IO thread for the next batch while we train the network
-      if self._cfg.TRAIN:
-        batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
-        self._filler.next()
-        # perform per-event normalization
-        if self._cfg.NORMALIZE_WEIGHTS:
-          batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
-        
-        self._net.zero_gradients(sess = sess)
-        
-        for j in range(self._cfg.NUM_MINIBATCHES):
-          self._net.accum_gradients(sess = sess,
-                          input_image = batch_data[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
-                          input_label = batch_label[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:],
-                          input_weight = batch_weight[j*self._cfg.MINIBATCH_SIZE:(j+1)*self._cfg.MINIBATCH_SIZE,:])
+        _, loss, acc_all, acc_nonzero = self._net.accum_gradients(sess = sess,
+                                                                  input_image = minibatch_data,
+                                                                  input_label = minibatch_label,
+                                                                  input_weight = minibatch_weight)
+        batch_metrics[j,0] = loss
+        batch_metrics[j,1] = acc_all
+        batch_metrics[j,1] = acc_nonzero
 
-        _, loss, acc_all, acc_nonzero = self._net.apply_gradients(sess = sess,
-                                                                  input_image  = batch_data,
-                                                                  input_label  = batch_label,
-                                                                  input_weight = batch_weight)
-        self._iteration += 1
-        msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
-        msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
-        sys.stdout.write(msg)
-        sys.stdout.flush()
-      else:
-        self._filler.next()
-        softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
-                                                          input_image = batch_data,
-                                                          input_label = batch_label)
-
-        print('Inference accuracy:', acc_all, '/', acc_nonzero)
-
-        if self._cfg.DUMP_IMAGE:
-          for image_index in xrange(len(softmax)):
-            event_image = softmax[image_index]
-            bg_image = event_image[:,:,0]
-            track_image = event_image[:,:,1]
-            shower_image = event_image[:,:,2]
-            bg_image_name = 'SOFTMAX_BG_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
-            track_image_name = 'SOFTMAX_TRACK_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
-            shower_image_name = 'SOFTMAX_SHOWER_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
-            
-            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
-            plt.imshow((bg_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(bg_image_name)
-            plt.close()
-
-            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
-            plt.imshow((shower_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(shower_image_name)
-            plt.close()
-            
-            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
-            plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
-            plt.close()
-
+      self._net.apply_gradients(sess = sess)
+      self._iteration += 1
+      msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
+      msg = msg % (self._iteration,np.mean(batch_metrics,axis=0)[0], np.mean(batch_metrics,axis=0)[1], np.mean(batch_metrics,axis=0)[2])
+      sys.stdout.write(msg)
+      sys.stdout.flush()
 
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
-        feed_dict = self._net.feed_dict(input_image  = batch_data,
-                                        input_label  = batch_label,
-                                        input_weight = batch_weight)
+        feed_dict = self._net.feed_dict(input_image  = minibatch_data,
+                                        input_label  = minibatch_label,
+                                        input_weight = minibatch_weight)
         writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
   
       # Save snapshot
