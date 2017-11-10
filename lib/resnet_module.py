@@ -9,29 +9,28 @@ import tensorflow.contrib.slim as slim
 
 def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), stride=1, scope='noscope'):
 
+    fn_conv = slim.conv2d
+    if len(input_tensor.shape) == 5:
+        fn_conv = slim.conv3d
+
     num_inputs  = input_tensor.get_shape()[-1].value
     with tf.variable_scope(scope):
         #
         # shortcut path
         #
         shortcut = None
-        if num_outputs == num_inputs:
-            if stride==1: 
-                shortcut = input_tensor
-            else: 
-                shortcut = slim.max_pool2d(inputs      = input_tensor,
-                                           kernel_size = [1,1],
-                                           stride      = stride,
-                                           scope       = 'shortcut')
+        if num_outputs == num_inputs and stride ==1 :
+            shortcut = input_tensor
         else:
-            shortcut = slim.conv2d(inputs      = input_tensor,
-                                   num_outputs = num_outputs,
-                                   kernel_size = [1,1],
-                                   stride      = stride,
-                                   trainable   = trainable,
-                                   normalizer_fn = None, 
-                                   activation_fn = None,
-                                   scope       = 'shortcut')
+            shortcut = fn_conv(inputs      = input_tensor,
+                               num_outputs = num_outputs,
+                               kernel_size = 1,
+                               stride      = stride,
+                               trainable   = trainable,
+                               padding     = 'same',
+                               normalizer_fn = None, 
+                               activation_fn = None,
+                               scope       = 'shortcut')
         #
         # residual path
         #
@@ -41,32 +40,34 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
         #                        activation_fn = tf.nn.relu,
         #                        scope      = 'resnet_bn1',
         #                        trainable  = trainable)
-        residual = slim.conv2d(inputs      = residual,
-                               num_outputs = num_outputs,
-                               kernel_size = kernel,
-                               stride      = stride,
-                               trainable   = trainable,
-                               normalizer_fn = None,
-                               activation_fn = None,
-                               scope       = 'resnet_conv1')
-
+        residual = fn_conv(inputs      = residual,
+                           num_outputs = num_outputs,
+                           kernel_size = kernel,
+                           stride      = stride,
+                           trainable   = trainable,
+                           padding     = 'same',
+                           normalizer_fn = None,
+                           activation_fn = None,
+                           scope       = 'resnet_conv1')
+        
         #residual = L.batch_norm(inputs     = residual, 
         #                        epsilon    = 0.00001,
         #                        activation_fn = tf.nn.relu,
         #                        scope      = 'resnet_bn2',
         #                        trainable  = trainable)
-        residual = slim.conv2d(inputs      = residual,
-                               num_outputs = num_outputs,
-                               kernel_size = kernel,
-                               stride      = 1,
-                               trainable   = trainable,
-                               normalizer_fn = None,
-                               activation_fn = None,
-                               scope       = 'resnet_conv2')
-    
+        residual = fn_conv(inputs      = residual,
+                           num_outputs = num_outputs,
+                           kernel_size = kernel,
+                           stride      = 1,
+                           trainable   = trainable,
+                           padding     = 'same',
+                           normalizer_fn = None,
+                           activation_fn = None,
+                           scope       = 'resnet_conv2')
+        
         return tf.nn.relu(shortcut + residual)
 
-def double_resnet(input_tensor, num_outputs, trainable=True, kernel=(3,3), stride=1, scope='noscope'):
+def double_resnet(input_tensor, num_outputs, trainable=True, kernel=3, stride=1, scope='noscope'):
 
     with tf.variable_scope(scope):
 

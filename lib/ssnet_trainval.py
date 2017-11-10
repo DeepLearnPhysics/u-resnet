@@ -21,11 +21,14 @@ class ssnet_trainval(object):
   def __init__(self):
     self._cfg = ssnet_config()
     self._filler = None
+    self._drainer = None
     self._iteration = -1
 
   def __del__(self):
     if self._filler:
       self._filler.reset()
+    if self._drainer:
+      self._drainer.finalize()
 
   def iteration_from_file_name(self,file_name):
     return int((file_name.split('-'))[-1])
@@ -37,7 +40,7 @@ class ssnet_trainval(object):
   def initialize(self):
     # Instantiate and configure
     if not self._cfg.FILLER_CONFIG:
-      'Must provide larcv data filler configuration file!'
+      print('Must provide larcv data filler configuration file!')
       return
 
     self._filler = larcv_threadio()
@@ -46,23 +49,25 @@ class ssnet_trainval(object):
                   'filler_cfg'  : self._cfg.FILLER_CONFIG}
     self._filler.configure(filler_cfg)
     # Start IO thread
-    self._filler.start_manager(self._cfg.MINIBATCH_SIZE)
-    # Storage ID
-    storage_id=0
+    self._filler.start_manager(self._cfg.BATCH_SIZE)
+    # If requested, construct an output stream
+    if self._cfg.DRAINER_CONFIG:
+      self._drainer = larcv.IOManager(self._cfg.DRAINER_CONFIG)
+      self._drainer.initialize()
+
     # Retrieve image/label dimensions
     self._filler.next()
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
-
-    self._net = uresnet(rows=dim_data[1], 
-                        cols=dim_data[2], 
+    dims = []
+    self._net = uresnet(dims=dim_data[1:],
                         num_class=3, 
                         base_num_outputs=self._cfg.BASE_NUM_FILTERS, 
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=True)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=False)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
 
     self._iteration = 0
 
@@ -70,8 +75,6 @@ class ssnet_trainval(object):
     # Configure global process (session, summary, etc.)
     # Create a bandle of summary
     merged_summary=tf.summary.merge_all()
-    # Create a session
-    #sess = tf.InteractiveSession()
     # Initialize variables
     sess.run(tf.global_variables_initializer())
     writer = None
@@ -102,44 +105,101 @@ class ssnet_trainval(object):
       reader=tf.train.Saver(var_list=vlist)
       reader.restore(sess,self._cfg.LOAD_FILE)
     
+    # Run iterations
     for i in xrange(self._cfg.ITERATIONS):
       if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
         print('Finished training (iteration %d)' % self._iteration)
         break
-      self._net.zero_gradients(sess = sess)
-      batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,3))
-      for j in xrange(self._cfg.NUM_MINIBATCHES):
-        minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
-        minibatch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
-        minibatch_weight = None
-        if self._cfg.TRAIN:
-          minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
-          self._filler.next()
-          # perform per-event normalization                                                                                                  
-          if self._cfg.NORMALIZE_WEIGHTS:
-            minibatch_weight /= np.mean(minibatch_weight,axis=1, keepdims=True)
+  
+      # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
+      batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
+      batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
+      batch_weight = None
+      # Start IO thread for the next batch while we train the network
+      if self._cfg.TRAIN:
+        if self._cfg.USE_WEIGHTS:
+          batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+          # perform per-event normalization
+          batch_weight /= (np.sum(batch_weight,axis=1).reshape([batch_weight.shape[0],1]))
+        self._filler.next()
+    
+        _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
+                                                     input_data   = batch_data,
+                                                     input_label  = batch_label,
+                                                     input_weight = batch_weight)
+        self._iteration += 1
+        msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
+        msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
+        sys.stdout.write(msg)
+        sys.stdout.flush()
+      else:
+        self._filler.next()
+        softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
+                                                          input_data  = batch_data,
+                                                          input_label = batch_label)
 
-        _, loss, acc_all, acc_nonzero = self._net.accum_gradients(sess = sess,
-                                                                  input_image = minibatch_data,
-                                                                  input_label = minibatch_label,
-                                                                  input_weight = minibatch_weight)
-        batch_metrics[j,0] = loss
-        batch_metrics[j,1] = acc_all
-        batch_metrics[j,1] = acc_nonzero
+        print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
-      self._net.apply_gradients(sess = sess)
-      self._iteration += 1
-      msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
-      msg = msg % (self._iteration,np.mean(batch_metrics,axis=0)[0], np.mean(batch_metrics,axis=0)[1], np.mean(batch_metrics,axis=0)[2])
-      sys.stdout.write(msg)
-      sys.stdout.flush()
+        if self._drainer:
+          for entry in xrange(len(softmax)):
+            self._drainer.read_entry(entry)
+            data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
+            label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])          
+            shower_score = softmax[entry,:,:,:,1]
+            track_score  = softmax[entry,:,:,:,2]
+            
+            sum_score = shower_score + track_score
+            shower_score = shower_score / sum_score
+            track_score  = track_score  / sum_score
+            
+            ssnet_result = (shower_score > track_score).astype(np.float32) + (track_score >= shower_score).astype(np.float32) * 2.0
+            nonzero_map = (data > 1.0).astype(np.int32)
+            ssnet_result = (ssnet_result * nonzero_map).astype(np.float32)
+            #print(ssnet_result.shape,ssnet_result.max(),ssnet_result.min(),(ssnet_result<1).astype(np.int32).sum())
+            #print(larcv.as_tensor3d(ssnet_result))
+
+            data = self._drainer.get_data("sparse3d","data")
+            sparse3d = self._drainer.get_data("sparse3d","ssnet")
+            sparse3d.meta(data.meta())
+            vs = larcv.as_tensor3d(ssnet_result)
+            #sparse3d = vs
+            #print( vs.as_vector().size())
+            #for vs_index in xrange(vs.as_vector().size()):
+            #  vox = vs.as_vector()[vs_index]
+            #  sparse3d.add(vs.as_vector()[vs_index])
+            sparse3d.set(vs,data.meta())
+            self._drainer.save_entry()
+            #self._drainer.clear_entry()
+        
+        if self._cfg.DUMP_IMAGE:
+          for image_index in xrange(len(softmax)):
+            event_image = softmax[image_index]
+            bg_image = event_image[:,:,0]
+            track_image = event_image[:,:,1]
+            shower_image = event_image[:,:,2]
+            bg_image_name = 'SOFTMAX_BG_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            track_image_name = 'SOFTMAX_TRACK_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            shower_image_name = 'SOFTMAX_SHOWER_%05d.png' % (i * self._cfg.BATCH_SIZE + image_index)
+            
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((bg_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(bg_image_name)
+            plt.close()
+
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((shower_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(shower_image_name)
+            plt.close()
+            
+            fig,ax = plt.subplots(figsize=(12,8),facecolor='w')
+            plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
+            plt.close()
+
 
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
-        feed_dict = self._net.feed_dict(input_image  = minibatch_data,
-                                        input_label  = minibatch_label,
-                                        input_weight = minibatch_weight)
+        feed_dict = self._net.feed_dict(input_data   = batch_data,
+                                        input_label  = batch_label,
+                                        input_weight = batch_weight)
         writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
   
       # Save snapshot
@@ -149,4 +209,7 @@ class ssnet_trainval(object):
         print()
         print('saved @',ssf_path)
 
-
+    self._filler.reset()
+    self._drainer.finalize()
+    del self._filler
+    #self._filler = None

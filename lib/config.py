@@ -13,14 +13,10 @@ class ssnet_config:
     LOAD_FILE         = ''
     AVOID_LOAD_PARAMS = []
     BATCH_SIZE        = 10
-    MINIBATCH_SIZE    = 2
-    NUM_MINIBATCHES   = 3
     ITERATIONS        = 100000
-
-    DUMP_IMAGE        = True
-
+    DUMP_IMAGE        = False
     TRAIN             = True
-    NORMALIZE_WEIGHTS = False
+    USE_WEIGHTS       = True
     CHECKPOINT_STEPS  = 200
     SUMMARY_STEPS     = 20
     KEYWORD_DATA      = 'data'
