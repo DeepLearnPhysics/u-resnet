@@ -146,12 +146,8 @@ class ssnet_trainval(object):
 
           for entry in xrange(len(softmax)):
 
-            print(entries[entry])
-            print( event_ids[entry])
-
-            self._drainer.read_entry(entry)
+            self._drainer.read_entry(entries[entry])
             data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
-            print(data.event_key())
             label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])          
             shower_score = softmax[entry,:,:,:,1]
             track_score  = softmax[entry,:,:,:,2]
@@ -175,6 +171,7 @@ class ssnet_trainval(object):
             #  vox = vs.as_vector()[vs_index]
             #  sparse3d.add(vs.as_vector()[vs_index])
             sparse3d.set(vs,data.meta())
+            #print(data.event_key())
             self._drainer.save_entry()
             #self._drainer.clear_entry()
         
