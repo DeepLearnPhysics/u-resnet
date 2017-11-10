@@ -56,7 +56,8 @@ class ssnet_trainval(object):
       self._drainer.initialize()
 
     # Retrieve image/label dimensions
-    self._filler.next()
+    self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                      store_event_ids = (not self._cfg.TRAIN))
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
     dims = []
     self._net = uresnet(dims=dim_data[1:],
@@ -123,7 +124,7 @@ class ssnet_trainval(object):
             minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
             # perform per-event normalization
             minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
-          self._filler.next()
+
           _,loss,acc_all,acc_nonzero = self._net.accum_gradients(sess         = sess, 
                                                                  input_data   = minibatch_data,
                                                                  input_label  = minibatch_label,
@@ -140,22 +141,34 @@ class ssnet_trainval(object):
                      np.mean(batch_metrics, axis=0)[2])
         sys.stdout.write(msg)
         sys.stdout.flush()
+
       else:
         # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
         batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
         batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
         batch_weight = None
-        self._filler.next()
+
         softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
                                                           input_data  = batch_data,
                                                           input_label = batch_label)
-
         print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
         if self._drainer:
           for entry in xrange(len(softmax)):
             self._drainer.read_entry(entry)
             data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
+          entries   = self._filler.fetch_entries()
+          event_ids = self._filler.fetch_event_ids()
+
+          for entry in xrange(len(softmax)):
+
+            print(entries[entry])
+            print( event_ids[entry])
+
+            self._drainer.read_entry(entry)
+            data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
+            print(data.event_key())
+
             label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])          
             shower_score = softmax[entry,:,:,:,1]
             track_score  = softmax[entry,:,:,:,2]
@@ -172,7 +185,6 @@ class ssnet_trainval(object):
 
             data = self._drainer.get_data("sparse3d","data")
             sparse3d = self._drainer.get_data("sparse3d","ssnet")
-            sparse3d.meta(data.meta())
             vs = larcv.as_tensor3d(ssnet_result)
             #sparse3d = vs
             #print( vs.as_vector().size())
@@ -205,7 +217,6 @@ class ssnet_trainval(object):
             plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
             plt.close()
 
-
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
@@ -220,6 +231,9 @@ class ssnet_trainval(object):
         ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
         print()
         print('saved @',ssf_path)
+
+      self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                        store_event_ids = (not self._cfg.TRAIN))
 
     self._filler.reset()
     self._drainer.finalize()

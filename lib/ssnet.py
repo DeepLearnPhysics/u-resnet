@@ -66,7 +66,7 @@ class ssnet_base(object):
         self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=net)
         if self._use_weight:
           self._loss = tf.multiply(weight,self._loss)
-        self._train = tf.train.AdamOptimizer.minimize(self._loss)
+        self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
         opt = tf.train.AdamOptimizer()
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
@@ -83,9 +83,9 @@ class ssnet_base(object):
   def zero_gradients(self, sess):
     return sess.run([self._zero_gradients])
 
-  def accum_gradients(self, sess, input_image, input_label, input_weight=None):
+  def accum_gradients(self, sess, input_data, input_label, input_weight=None):
 
-    feed_dict = self.feed_dict(input_image  = input_image,
+    feed_dict = self.feed_dict(input_data  = input_data,
                                input_label  = input_label,
                                input_weight = input_weight)
     
