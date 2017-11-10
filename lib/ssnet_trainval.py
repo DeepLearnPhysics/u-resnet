@@ -52,17 +52,16 @@ class ssnet_trainval(object):
     # Retrieve image/label dimensions
     self._filler.next()
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
-
-    self._net = uresnet(rows=dim_data[1], 
-                        cols=dim_data[2], 
+    dims = []
+    self._net = uresnet(dims=dim_data[1:],
                         num_class=3, 
                         base_num_outputs=self._cfg.BASE_NUM_FILTERS, 
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=True)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=False)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
 
     self._iteration = 0
 
@@ -114,14 +113,14 @@ class ssnet_trainval(object):
       batch_weight = None
       # Start IO thread for the next batch while we train the network
       if self._cfg.TRAIN:
-        batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+        if self._cfg.USE_WEIGHTS:
+          batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+          # perform per-event normalization
+          batch_weight /= (np.sum(batch_weight,axis=1).reshape([batch_weight.shape[0],1]))
         self._filler.next()
-        # perform per-event normalization
-        if self._cfg.NORMALIZE_WEIGHTS:
-          batch_weight /= np.mean(batch_weight,axis=1).reshape([batch_weight.shape[0],1])
     
         _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
-                                                     input_image  = batch_data,
+                                                     input_data   = batch_data,
                                                      input_label  = batch_label,
                                                      input_weight = batch_weight)
         self._iteration += 1
@@ -132,7 +131,7 @@ class ssnet_trainval(object):
       else:
         self._filler.next()
         softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
-                                                          input_image = batch_data,
+                                                          input_data  = batch_data,
                                                           input_label = batch_label)
 
         print('Inference accuracy:', acc_all, '/', acc_nonzero)
@@ -163,7 +162,7 @@ class ssnet_trainval(object):
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
-        feed_dict = self._net.feed_dict(input_image  = batch_data,
+        feed_dict = self._net.feed_dict(input_data   = batch_data,
                                         input_label  = batch_label,
                                         input_weight = batch_weight)
         writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
