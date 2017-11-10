@@ -66,7 +66,7 @@ class ssnet_base(object):
         self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=net)
         if self._use_weight:
           self._loss = tf.multiply(weight,self._loss)
-        self._train = tf.train.AdamOptimizer().minimize(self._loss)
+        #self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
         opt = tf.train.AdamOptimizer()
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
@@ -75,7 +75,7 @@ class ssnet_base(object):
         self._apply_gradients = opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
 
       if len(self._dims) == 3:
-        tf.summary.image('data_example',data,10)
+        tf.summary.image('data_example',tf.image.grayscale_to_rgb(data,'gray_to_rgb'),10)
       tf.summary.scalar('accuracy_all', self._accuracy_allpix)
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
@@ -95,15 +95,15 @@ class ssnet_base(object):
 
     return sess.run( [self._apply_gradients], feed_dict = {} )
 
-  def train(self,sess,input_data,input_label,input_weight=None):
-
-    feed_dict = self.feed_dict(input_data   = input_data,
-                               input_label  = input_label,
-                               input_weight = input_weight)
-
-    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
-
-    return sess.run( ops, feed_dict = feed_dict )
+#  def train(self,sess,input_data,input_label,input_weight=None):
+#
+#    feed_dict = self.feed_dict(input_data   = input_data,
+#                               input_label  = input_label,
+#                               input_weight = input_weight)
+#
+#    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
+#
+#    return sess.run( ops, feed_dict = feed_dict )
 
 
   def inference(self,sess,input_data,input_label=None):
