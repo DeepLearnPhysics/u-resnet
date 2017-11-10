@@ -21,11 +21,14 @@ class ssnet_trainval(object):
   def __init__(self):
     self._cfg = ssnet_config()
     self._filler = None
+    self._drainer = None
     self._iteration = -1
 
   def __del__(self):
     if self._filler:
       self._filler.reset()
+    if self._drainer:
+      self._drainer.finalize()
 
   def iteration_from_file_name(self,file_name):
     return int((file_name.split('-'))[-1])
@@ -37,7 +40,7 @@ class ssnet_trainval(object):
   def initialize(self):
     # Instantiate and configure
     if not self._cfg.FILLER_CONFIG:
-      'Must provide larcv data filler configuration file!'
+      print('Must provide larcv data filler configuration file!')
       return
 
     self._filler = larcv_threadio()
@@ -47,10 +50,14 @@ class ssnet_trainval(object):
     self._filler.configure(filler_cfg)
     # Start IO thread
     self._filler.start_manager(self._cfg.BATCH_SIZE)
-    # Storage ID
-    storage_id=0
+    # If requested, construct an output stream
+    if self._cfg.DRAINER_CONFIG:
+      self._drainer = larcv.IOManager(self._cfg.DRAINER_CONFIG)
+      self._drainer.initialize()
+
     # Retrieve image/label dimensions
-    self._filler.next()
+    self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                      store_event_ids = (not self._cfg.TRAIN))
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
     dims = []
     self._net = uresnet(dims=dim_data[1:],
@@ -69,8 +76,6 @@ class ssnet_trainval(object):
     # Configure global process (session, summary, etc.)
     # Create a bandle of summary
     merged_summary=tf.summary.merge_all()
-    # Create a session
-    #sess = tf.InteractiveSession()
     # Initialize variables
     sess.run(tf.global_variables_initializer())
     writer = None
@@ -117,7 +122,6 @@ class ssnet_trainval(object):
           batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
           # perform per-event normalization
           batch_weight /= (np.sum(batch_weight,axis=1).reshape([batch_weight.shape[0],1]))
-        self._filler.next()
     
         _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
                                                      input_data   = batch_data,
@@ -128,15 +132,53 @@ class ssnet_trainval(object):
         msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
         sys.stdout.write(msg)
         sys.stdout.flush()
+
       else:
-        self._filler.next()
         softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
                                                           input_data  = batch_data,
                                                           input_label = batch_label)
-
         print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
-        if False:
+        if self._drainer:
+
+          entries   = self._filler.fetch_entries()
+          event_ids = self._filler.fetch_event_ids()
+
+          for entry in xrange(len(softmax)):
+
+            print(entries[entry])
+            print( event_ids[entry])
+
+            self._drainer.read_entry(entry)
+            data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
+            print(data.event_key())
+            label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])          
+            shower_score = softmax[entry,:,:,:,1]
+            track_score  = softmax[entry,:,:,:,2]
+            
+            sum_score = shower_score + track_score
+            shower_score = shower_score / sum_score
+            track_score  = track_score  / sum_score
+            
+            ssnet_result = (shower_score > track_score).astype(np.float32) + (track_score >= shower_score).astype(np.float32) * 2.0
+            nonzero_map = (data > 1.0).astype(np.int32)
+            ssnet_result = (ssnet_result * nonzero_map).astype(np.float32)
+            #print(ssnet_result.shape,ssnet_result.max(),ssnet_result.min(),(ssnet_result<1).astype(np.int32).sum())
+            #print(larcv.as_tensor3d(ssnet_result))
+
+            data = self._drainer.get_data("sparse3d","data")
+            sparse3d = self._drainer.get_data("sparse3d","ssnet")
+            vs = larcv.as_tensor3d(ssnet_result)
+            #sparse3d = vs
+            #print( vs.as_vector().size())
+            #for vs_index in xrange(vs.as_vector().size()):
+            #  vox = vs.as_vector()[vs_index]
+            #  sparse3d.add(vs.as_vector()[vs_index])
+            sparse3d.set(vs,data.meta())
+            self._drainer.save_entry()
+            #self._drainer.clear_entry()
+        
+        if self._cfg.DUMP_IMAGE:
           for image_index in xrange(len(softmax)):
             event_image = softmax[image_index]
             bg_image = event_image[:,:,0]
@@ -158,7 +200,6 @@ class ssnet_trainval(object):
             plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
             plt.close()
 
-
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
@@ -174,4 +215,13 @@ class ssnet_trainval(object):
         print()
         print('saved @',ssf_path)
 
+      self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                        store_event_ids = (not self._cfg.TRAIN))
 
+
+
+
+    self._filler.reset()
+    self._drainer.finalize()
+    del self._filler
+    #self._filler = None

@@ -8,6 +8,7 @@ class ssnet_config:
     NUM_CLASS         = 3
     BASE_NUM_FILTERS  = 16
     FILLER_CONFIG     = 'config/train_io.cfg'
+    DRAINER_CONFIG    = ''
     LOGDIR            = 'ssnet_train_log'
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
