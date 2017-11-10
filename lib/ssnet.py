@@ -65,20 +65,20 @@ class ssnet_base(object):
       with tf.variable_scope('train'):
         self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=net)
         if self._use_weight:
-
-          loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net)
-          self._loss = tf.reduce_mean(tf.multiply(weight_nhw, loss))
-        else:
-          self._loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label_nhw, logits=net))
-        opt = tf.train.AdamOptimizer(0.0003)
+          self._loss = tf.multiply(weight,self._loss)
+        self._train = tf.train.AdamOptimizer.minimize(self._loss)
+        self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
+        opt = tf.train.AdamOptimizer()
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
         self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
                                  i, gv in enumerate(opt.compute_gradients(self._loss))]
         self._apply_gradients = opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
-        tf.summary.image('data_example',image_nhwc,10)
-        tf.summary.scalar('accuracy_all', self._accuracy_allpix)
-        tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
-        tf.summary.scalar('loss',self._loss)
+
+      if len(self._dims) == 3:
+        tf.summary.image('data_example',data,10)
+      tf.summary.scalar('accuracy_all', self._accuracy_allpix)
+      tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
+      tf.summary.scalar('loss',self._loss)
 
   def zero_gradients(self, sess):
     return sess.run([self._zero_gradients])
@@ -94,16 +94,6 @@ class ssnet_base(object):
   def apply_gradients(self,sess):
 
     return sess.run( [self._apply_gradients], feed_dict = {} )
-
-          self._loss = tf.multiply(weight,self._loss)
-        self._train = tf.train.RMSPropOptimizer(0.0003).minimize(self._loss)
-        self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
-
-      if len(self._dims) == 3:
-        tf.summary.image('data_example',data,10)
-      tf.summary.scalar('accuracy_all', self._accuracy_allpix)
-      tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
-      tf.summary.scalar('loss',self._loss)
 
   def train(self,sess,input_data,input_label,input_weight=None):
 
