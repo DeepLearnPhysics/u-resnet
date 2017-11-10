@@ -34,9 +34,9 @@ class ssnet_base(object):
       shape_dim = [-1]
       for dim in self._dims: shape_dim.append(dim)
 
-      data   = tf.reshape(self._input_data,  shape_dim,      name='data_reshape'  )
-      label  = tf.reshape(self._input_label, shape_dim[:-1], name='label_reshape' )
-      weight = tf.reshape(self._input_label, shape_dim[:-1], name='weight_reshape')
+      data   = tf.reshape(self._input_data,   shape_dim,      name='data_reshape'  )
+      label  = tf.reshape(self._input_label,  shape_dim[:-1], name='label_reshape' )
+      weight = tf.reshape(self._input_weight, shape_dim[:-1], name='weight_reshape')
 
       label = tf.cast(label,tf.int64)
       
