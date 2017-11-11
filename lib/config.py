@@ -13,6 +13,7 @@ class ssnet_config:
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
     AVOID_LOAD_PARAMS = []
+    LEARNING_RATE     = -1
     BATCH_SIZE        = 10
     MINIBATCH_SIZE    = 10
     NUM_MINIBATCHES   = 5

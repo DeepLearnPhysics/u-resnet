@@ -66,7 +66,8 @@ class ssnet_trainval(object):
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS,
+                          learning_rate=self._cfg.LEARNING_RATE)
     else:
       self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
 
@@ -125,7 +126,7 @@ class ssnet_trainval(object):
             # perform per-event normalization
             minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
 
-          _,loss,acc_all,acc_nonzero = self._net.accum_gradients(sess         = sess, 
+          _,loss,acc_all,acc_nonzero = self._net.accum_gradients(sess         = sess,
                                                                  input_data   = minibatch_data,
                                                                  input_label  = minibatch_label,
                                                                  input_weight = minibatch_weight)

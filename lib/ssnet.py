@@ -17,10 +17,11 @@ class ssnet_base(object):
   def _build(self,input_tensor):
     raise NotImplementedError
 
-  def construct(self,trainable=True,use_weight=True):
+  def construct(self,trainable=True,use_weight=True, learning_rate=None):
 
     self._trainable  = bool(trainable)
     self._use_weight = bool(use_weight)
+    self._learning_rate = learning_rate
 
     entry_size = 1
     for dim in self._dims: 
@@ -50,7 +51,7 @@ class ssnet_base(object):
     self._accuracy_nonzero = None
 
     with tf.variable_scope('accum_grad'):
-      self._accum_vars = [tf.Variable(tf.zeros_like(tv.initialized_value()),
+      self._accum_vars = [tf.Variable(tv.initialized_value(),
                                       trainable=False) for tv in tf.trainable_variables()]
 
     with tf.variable_scope('metrics'):
@@ -68,7 +69,10 @@ class ssnet_base(object):
           self._loss = tf.multiply(weight,self._loss)
         #self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
-        opt = tf.train.AdamOptimizer()
+        if self._learning_rate == -1:
+          opt = tf.train.AdamOptimizer()
+        else:
+          opt = tf.train.AdamOptimizer(self._learning_rate)
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
         self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
                                  i, gv in enumerate(opt.compute_gradients(self._loss))]
@@ -93,7 +97,7 @@ class ssnet_base(object):
 
   def apply_gradients(self,sess):
 
-    return sess.run( [self._apply_gradients], feed_dict = {} )
+    return sess.run( [self._apply_gradients], feed_dict = {})
 
 #  def train(self,sess,input_data,input_label,input_weight=None):
 #
