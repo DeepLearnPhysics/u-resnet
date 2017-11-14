@@ -79,7 +79,7 @@ class ssnet_trainval(object):
 
   def _report(self,step,metrics,descr):
     msg = 'Training in progress @ step %-4d ... ' % step
-    for i,desc in enumerate(descr_metrics):
+    for i,desc in enumerate(descr):
       if not desc: continue
       msg += '%s=%6.6g ' % (desc,metrics[i])
     msg += '             \r'
@@ -141,7 +141,7 @@ class ssnet_trainval(object):
             # perform per-event normalization
             minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
           if self._cfg.PREDICT_VERTEX:
-            minibatch_vertex = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX).data()
+            minibatch_vertex_label = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_LABEL).data()
 
           res,doc = self._net.accum_gradients(sess               = sess,
                                               input_data         = minibatch_data,
@@ -150,13 +150,13 @@ class ssnet_trainval(object):
                                               input_weight       = minibatch_weight)
           if batch_metrics is None:
             batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,len(res)-1),dtype=np.float32)
-            descr_metrics = doc
+            descr_metrics = doc[1:]
           batch_metrics[j,:] = res[1:]
         #update
         self._net.apply_gradients(sess)
 
         self._iteration += 1
-        self._report(np.mean(batch_metrics,axis=0),descr_metrics)
+        self._report(self._iteration,np.mean(batch_metrics,axis=0),descr_metrics)
 
       else:
         # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
@@ -232,9 +232,10 @@ class ssnet_trainval(object):
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
-        feed_dict = self._net.feed_dict(input_data   = minibatch_data,
+        feed_dict = self._net.feed_dict(input_data         = minibatch_data,
                                         input_class_label  = minibatch_class_label,
-                                        input_weight = minibatch_weight)
+                                        input_vertex_label = minibatch_vertex_label,
+                                        input_weight       = minibatch_weight)
         writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
   
       # Save snapshot

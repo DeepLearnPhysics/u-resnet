@@ -77,11 +77,15 @@ class ssnet_base(object):
 
         if self._predict_vertex:
           with tf.variable_scope('vertex_metrics'):
-            self._vertex_accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(head_vertex,len(self._dims)), vertex_label),tf.float32))
-            nonzero_vertex_label = tf.gather_nd(vertex_label,nonzero_idx)
-            nonzero_vertex_pred  = tf.gather_nd(tf.argmax(head_vertex,len(self._dims)),nonzero_idx)
-            self._vertex_accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(nonzero_vertex_label,nonzero_vertex_pred),tf.float32))
-            self._vertex_prediction = tf.nn.sigmoid(logits=head_vertex)
+            vertex_score_threshold    = 0.5
+            candidate_vertex_location = tf.to_int64(head_vertex  > tf.to_float(vertex_score_threshold))
+            correct_vertex_location   = tf.to_int64(vertex_label > tf.to_float(vertex_score_threshold))
+            self._vertex_accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(candidate_vertex_location,correct_vertex_location),tf.float32))
+            # next provide non-zero mask
+            candidate_vertex_location = tf.gather_nd(candidate_vertex_location, nonzero_idx)
+            correct_vertex_location   = tf.gather_nd(correct_vertex_location,   nonzero_idx)
+            self._vertex_accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(candidate_vertex_location,correct_vertex_location),tf.float32))
+            self._vertex_prediction = tf.nn.sigmoid(x=head_vertex)
 
     if not self._trainable: return
 
@@ -95,7 +99,7 @@ class ssnet_base(object):
 
     if self._predict_vertex:
       with tf.variable_scope('vertex_train'):
-        self._vertex_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=vertex_label, logits=net_vertex)
+        self._vertex_loss = tf.squeeze(tf.nn.sigmoid_cross_entropy_with_logits(labels=vertex_label, logits=head_vertex),axis=len(self._dims))
         if self._use_weight:
           self._vertex_loss = tf.multiply(weight, self._vertex_loss)
         self._vertex_loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._vertex_loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
@@ -153,7 +157,7 @@ class ssnet_base(object):
   def inference(self,sess,input_data,input_class_label=None,input_vertex_label=None):
     
     feed_dict = self.feed_dict(input_data         = input_data, 
-                               input_class_label  = input_label, 
+                               input_class_label  = input_class_label, 
                                input_vertex_label = input_vertex_label)
 
     doc = ['class pred']
@@ -175,7 +179,7 @@ class ssnet_base(object):
       raise TypeError
 
     feed_dict = { self._input_data : input_data }
-    if input_label is not None:
+    if input_class_label is not None:
       feed_dict[ self._input_class_label  ] = input_class_label
     if input_weight is not None:
       feed_dict[ self._input_weight       ] = input_weight

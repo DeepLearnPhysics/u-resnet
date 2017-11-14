@@ -25,7 +25,7 @@ class uresnet(ssnet_base):
         fn_conv = slim.conv2d
         fn_conv_transpose = slim.conv2d_transpose
         if len(input_tensor.shape) == 5:
-            print('\033[93m 3D!\033[00m')
+            #print('\033[93m 3D!\033[00m')
             fn_conv = slim.conv3d
             fn_conv_transpose = slim.conv3d_transpose
 

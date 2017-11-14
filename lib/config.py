@@ -24,9 +24,10 @@ class ssnet_config:
     CHECKPOINT_STEPS  = 200
     SUMMARY_STEPS     = 20
     KEYWORD_DATA      = 'data'
-    KEYWORD_LABEL     = 'label'
-    KEYWORD_WEIGHT    = 'weight'
-    PREDICT_VERTEX    = False
+    KEYWORD_CLASS_LABEL  = 'label'
+    KEYWORD_VERTEX_LABEL = ''
+    KEYWORD_WEIGHT       = 'weight'
+    PREDICT_VERTEX       = False
 
     def __init__(self):
         pass
