@@ -36,17 +36,18 @@ class ssnet_base(object):
 
       data   = tf.reshape(self._input_data,   shape_dim,      name='data_reshape'  )
       label  = tf.reshape(self._input_label,  shape_dim[:-1], name='label_reshape' )
-      label_vertex = tf.reshape(self._input_label_vertex,  shape_dim[:-1], name='label_vertex_reshape' )
+      label_vertex = tf.reshape(self._input_label_vertex,  shape_dim, name='label_vertex_reshape' )
       weight = tf.reshape(self._input_weight, shape_dim[:-1], name='weight_reshape')
 
       label = tf.cast(label,tf.int64)
-      label_vertex = tf.cast(label_vertex, tf.int64)
+      #label_vertex = tf.cast(label_vertex, tf.int64)
       
     net = self._build(input_tensor=data)
 
     self._softmax = None
     self._train   = None
     self._loss    = None
+    self._loss_vertex = None
     self._accuracy_allpix = None
     self._accuracy_nonzero = None
     self._accuracy_vertex = None
@@ -54,13 +55,13 @@ class ssnet_base(object):
     with tf.variable_scope('accum_grad'):
       self._accum_vars = [tf.Variable(tv.initialized_value(),
                                       trainable=False) for tv in tf.trainable_variables()]
-
-    with tf.variable_scope('metrics'):
+    
+    with tf.variable_scope('class_metrics'):
       if self._vertex:
-        net, net_vertex = tf.split(net, [3,1], axis=3)
+        net, net_vertex = tf.split(net, [net.get_shape()[-1].value - 1,1], axis=len(self._dims))
         self._accuracy_vertex = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net_vertex,len(self._dims)), label),tf.float32))
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
-      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > 10.)
+      nonzero_idx   = tf.where(tf.reshape(data, shape_dim[:-1]) > tf.to_float(0.))
       nonzero_label = tf.gather_nd(label,nonzero_idx)
       nonzero_pred  = tf.gather_nd(tf.argmax(net,len(self._dims)),nonzero_idx)
       self._accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(nonzero_label,nonzero_pred),tf.float32))
@@ -68,7 +69,7 @@ class ssnet_base(object):
 
     if self._trainable:
       if self._vertex:
-        net, net_vertex = tf.split(net, [self._dims[-1]-1,1], axis=len(self._dims)-1)
+        #net, net_vertex = tf.split(net, [self._dims[-1]-1,1], axis=len(self._dims)-1)
         with tf.variable_scope('train_vertex'):
           self._loss_vertex = tf.nn.sigmoid_cross_entropy_with_logits(labels=label_vertex, logits=net_vertex)
           if self._use_weight:
@@ -99,16 +100,17 @@ class ssnet_base(object):
       tf.summary.scalar('accuracy_all', self._accuracy_allpix)
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
-      tf.summary.scalar('vertex loss', self._loss_vertex)
+      if self._vertex:
+        tf.summary.scalar('vertex loss', self._loss_vertex)
 
   def zero_gradients(self, sess):
     return sess.run([self._zero_gradients])
 
-  def accum_gradients(self, sess, input_data, input_label, input_label_vertex=None, input_weight=None):
+  def accum_gradients(self, sess, input_data, input_label, input_weight=None, input_label_vertex=None):
 
     feed_dict = self.feed_dict(input_data  = input_data,
                                input_label  = input_label,
-                               input_weight = input_weight
+                               input_weight = input_weight,
                                input_label_vertex = input_label_vertex)
     
     return sess.run([self._accum_gradients, self._loss, self._accuracy_allpix, self._accuracy_nonzero], feed_dict = feed_dict )
@@ -139,7 +141,7 @@ class ssnet_base(object):
 
     return sess.run( ops, feed_dict = feed_dict )
 
-  def feed_dict(self,input_data,input_label=None,input_weight=None):
+  def feed_dict(self,input_data,input_label=None,input_weight=None,input_label_vertex=None):
 
     if input_weight is None and self._use_weight:
       sys.stderr.write('Network configured to use loss pixel-weighting. Cannot run w/ input_weight=None...\n')
@@ -150,6 +152,7 @@ class ssnet_base(object):
       feed_dict[ self._input_label ] = input_label
     if input_weight is not None:
       feed_dict[ self._input_weight ] = input_weight
-    
+    if input_label_vertex is not None:
+      feed_dict[ self._input_label_vertex ] = input_label_vertex
     return feed_dict
 

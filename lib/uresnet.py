@@ -109,8 +109,13 @@ class uresnet(ssnet_base):
                           activation_fn = tf.nn.relu,
                           scope       = 'conv1')
             if self._debug: print(net.shape, 'after conv1')
+
+            final_num_outputs = self._num_class
+            if self._vertex:
+                final_num_outputs += 1
+
             net = fn_conv(inputs      = net,
-                          num_outputs = self._num_class,
+                          num_outputs = final_num_outputs,
                           padding     = 'same',
                           kernel_size = 3,
                           stride      = 1,
@@ -127,6 +132,7 @@ if __name__ == '__main__':
     dims = [512,512,1]
     if '3d' in sys.argv:
         dims = [128,128,128,1]
+    vtx = 'vtx' in sys.argv
     # some constants
     BATCH=1
     NUM_CLASS=3
@@ -134,7 +140,7 @@ if __name__ == '__main__':
     net = uresnet(dims=dims,
                   num_class=NUM_CLASS,
                   debug=True)
-    net.construct(trainable=True,use_weight=True)
+    net.construct(trainable=True,use_weight=True,vertex=vtx)
 
     import sys
     if 'save' in sys.argv:
