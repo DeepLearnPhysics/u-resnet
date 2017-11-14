@@ -40,6 +40,7 @@ class ssnet_base(object):
       weight = tf.reshape(self._input_weight, shape_dim[:-1], name='weight_reshape')
 
       label = tf.cast(label,tf.int64)
+      label_vertex = tf.cast(label_vertex, tf.int64)
       
     net = self._build(input_tensor=data)
 
