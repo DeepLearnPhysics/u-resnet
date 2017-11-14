@@ -67,9 +67,9 @@ class ssnet_trainval(object):
 
     if self._cfg.TRAIN:
       self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS,
-                          learning_rate=self._cfg.LEARNING_RATE)
+                          learning_rate=self._cfg.LEARNING_RATE, vertex=self._cfg.VERTEX)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
+      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS, vertex=self._cfg.VERTEX)
 
     self._iteration = 0
 
@@ -120,6 +120,7 @@ class ssnet_trainval(object):
           self._net.zero_gradients(sess)
           minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
           minibatch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
+          minibatch_vertex_label = None
           minibatch_weight = None
           if self._cfg.USE_WEIGHTS:
             minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
@@ -129,6 +130,7 @@ class ssnet_trainval(object):
           _,loss,acc_all,acc_nonzero = self._net.accum_gradients(sess         = sess,
                                                                  input_data   = minibatch_data,
                                                                  input_label  = minibatch_label,
+                                                                 input_label_vertex = minibatch_vertex_label,
                                                                  input_weight = minibatch_weight)
           batch_metrics[j,0] = loss
           batch_metrics[j,1] = acc_all
