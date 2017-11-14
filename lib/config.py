@@ -26,6 +26,7 @@ class ssnet_config:
     KEYWORD_DATA      = 'data'
     KEYWORD_LABEL     = 'label'
     KEYWORD_WEIGHT    = 'weight'
+    PREDICT_VERTEX    = False
 
     def __init__(self):
         pass
