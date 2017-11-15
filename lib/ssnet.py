@@ -77,15 +77,21 @@ class ssnet_base(object):
 
         if self._predict_vertex:
           with tf.variable_scope('vertex_metrics'):
+            self._vertex_prediction = tf.nn.sigmoid(x=head_vertex)
             vertex_score_threshold    = 0.5
-            candidate_vertex_location = tf.to_int64(head_vertex  > tf.to_float(vertex_score_threshold))
+            candidate_vertex_location = tf.to_int64(self._vertex_prediction  > tf.to_float(vertex_score_threshold))
             correct_vertex_location   = tf.to_int64(vertex_label > tf.to_float(vertex_score_threshold))
             self._vertex_accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(candidate_vertex_location,correct_vertex_location),tf.float32))
             # next provide non-zero mask
-            candidate_vertex_location = tf.gather_nd(candidate_vertex_location, nonzero_idx)
-            correct_vertex_location   = tf.gather_nd(correct_vertex_location,   nonzero_idx)
-            self._vertex_accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(candidate_vertex_location,correct_vertex_location),tf.float32))
-            self._vertex_prediction = tf.nn.sigmoid(x=head_vertex)
+            union_idx = tf.maximum(candidate_vertex_location, correct_vertex_location)
+            candidate_vertex_location = tf.gather_nd(candidate_vertex_location, tf.where(union_idx>tf.to_int64(0)))
+            correct_vertex_location = tf.gather_nd(correct_vertex_location, tf.where(union_idx>tf.to_int64(0)))
+            # candidate_vertex_location = tf.gather_nd(candidate_vertex_location, nonzero_idx)
+            # correct_vertex_location   = tf.gather_nd(correct_vertex_location,   nonzero_idx)
+            if tf.size(tf.where(union_idx>tf.to_int64(0)))==0:
+              self._vertex_accuracy_nonzero = 1.
+            else:
+              self._vertex_accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(candidate_vertex_location,correct_vertex_location),tf.float32))
 
     if not self._trainable: return
 
