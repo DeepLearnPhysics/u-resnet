@@ -13,7 +13,7 @@ class ssnet_config:
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
     AVOID_LOAD_PARAMS = []
-    LEARNING_RATE     = -1
+    LEARNING_RATE     = -1.
     BATCH_SIZE        = 10
     MINIBATCH_SIZE    = 10
     NUM_MINIBATCHES   = 5
@@ -25,8 +25,9 @@ class ssnet_config:
     SUMMARY_STEPS     = 20
     KEYWORD_DATA      = 'data'
     KEYWORD_CLASS_LABEL  = 'label'
-    KEYWORD_VERTEX_LABEL = ''
-    KEYWORD_WEIGHT       = 'weight'
+    KEYWORD_CLASS_WEIGHT = 'weight'
+    KEYWORD_VERTEX_LABEL  = ''
+    KEYWORD_VERTEX_WEIGHT = ''
     PREDICT_VERTEX       = False
 
     def __init__(self):

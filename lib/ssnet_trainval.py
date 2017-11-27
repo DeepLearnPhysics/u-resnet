@@ -133,36 +133,66 @@ class ssnet_trainval(object):
         for j in xrange(self._cfg.NUM_MINIBATCHES):
           self._net.zero_gradients(sess)
           minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
-          minibatch_class_label  = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_LABEL).data()
-          minibatch_vertex_label = None
-          minibatch_weight = None
+          minibatch_class_label   = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_LABEL).data()
+          minibatch_class_weight  = None
+          minibatch_vertex_label  = None
+          minibatch_vertex_weight = None
           if self._cfg.USE_WEIGHTS:
-            minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+            minibatch_class_weight = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_WEIGHT).data()
             # perform per-event normalization
-            minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
+            #print(np.sum(minibatch_class_weight,axis=1))
+            minibatch_class_weight /= (np.sum(minibatch_class_weight,axis=1).reshape([minibatch_class_weight.shape[0],1]))
+            #print( (minibatch_class_weight[0] > 0.).astype(np.int32).sum() )
           if self._cfg.PREDICT_VERTEX:
-            minibatch_vertex_label = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_LABEL).data()
-
-          res,doc = self._net.accum_gradients(sess               = sess,
-                                              input_data         = minibatch_data,
-                                              input_class_label  = minibatch_class_label,
-                                              input_vertex_label = minibatch_vertex_label,
-                                              input_weight       = minibatch_weight)
+            minibatch_vertex_label  = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_LABEL ).data()
+            minibatch_vertex_weight = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_WEIGHT).data()
+            # perform per-event normalization
+            #print(np.sum(minibatch_vertex_weight,axis=1))
+            minibatch_vertex_weight /= (np.sum(minibatch_vertex_weight,axis=1).reshape([minibatch_vertex_weight.shape[0],1]))
+            #print( (minibatch_vertex_weight[0] > 0.).astype(np.int32).sum() )
+          res,doc = self._net.accum_gradients(sess                = sess,
+                                              input_data          = minibatch_data,
+                                              input_class_label   = minibatch_class_label,
+                                              input_class_weight  = minibatch_class_weight,
+                                              input_vertex_label  = minibatch_vertex_label,
+                                              input_vertex_weight = minibatch_vertex_weight)
           if batch_metrics is None:
             batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,len(res)-1),dtype=np.float32)
             descr_metrics = doc[1:]
           batch_metrics[j,:] = res[1:]
+          self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                            store_event_ids = (not self._cfg.TRAIN))
         #update
         self._net.apply_gradients(sess)
 
         self._iteration += 1
         self._report(self._iteration,np.mean(batch_metrics,axis=0),descr_metrics)
 
+        # Save log
+        if self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
+          # Run summary
+          feed_dict = self._net.feed_dict(input_data          = minibatch_data,
+                                          input_class_label   = minibatch_class_label,
+                                          input_class_weight  = minibatch_class_weight,
+                                          input_vertex_label  = minibatch_vertex_label,
+                                          input_vertex_weight = minibatch_vertex_weight)
+                                        
+          writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
+  
+        # Save snapshot
+        if self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
+          # Save snapshot
+          ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
+          print()
+          print('saved @',ssf_path)
+
       else:
-        # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
+        # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
+
         batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
-        batch_class_label  = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_LABEL).data()
-        batch_weight = None
+        batch_class_label   = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_LABEL).data()
+        batch_class_weight  = None
+        batch_vertex_weight = None
 
         softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
                                                           input_data  = batch_data,
@@ -229,24 +259,8 @@ class ssnet_trainval(object):
             plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
             plt.close()
 
-      # Save log
-      if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
-        # Run summary
-        feed_dict = self._net.feed_dict(input_data         = minibatch_data,
-                                        input_class_label  = minibatch_class_label,
-                                        input_vertex_label = minibatch_vertex_label,
-                                        input_weight       = minibatch_weight)
-        writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
-  
-      # Save snapshot
-      if self._cfg.TRAIN and self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
-        # Save snapshot
-        ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
-        print()
-        print('saved @',ssf_path)
-
-      self._filler.next(store_entries   = (not self._cfg.TRAIN),
-                        store_event_ids = (not self._cfg.TRAIN))
+        self._filler.next(store_entries   = (not self._cfg.TRAIN),
+                          store_event_ids = (not self._cfg.TRAIN))
 
     self._filler.reset()
     self._drainer.finalize()
