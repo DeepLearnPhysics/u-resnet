@@ -81,8 +81,8 @@ class ssnet_trainval(object):
     msg = 'Training in progress @ step %-4d ... ' % step
     for i,desc in enumerate(descr):
       if not desc: continue
-      msg += '%s=%6.6g ' % (desc,metrics[i])
-    msg += '             \r'
+      msg += '%s=%6.6f   ' % (desc,metrics[i])
+    msg += '\n'
     sys.stdout.write(msg)
     sys.stdout.flush()
 
