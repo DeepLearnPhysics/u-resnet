@@ -22,9 +22,7 @@ class ssnet_base(object):
     self._trainable  = bool(trainable)
     self._use_weight = bool(use_weight)
 
-    entry_size = 1
-    for dim in self._dims: 
-      entry_size *= dim
+    entry_size = np.prod(self._dims)
 
     with tf.variable_scope('input_prep'):
       self._input_data   = tf.placeholder(tf.float32, [None, entry_size], name='input_data'  )
@@ -50,7 +48,7 @@ class ssnet_base(object):
 
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
-      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > 10.)
+      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > tf.to_float(0.))
       nonzero_label = tf.gather_nd(label,nonzero_idx)
       nonzero_pred  = tf.gather_nd(tf.argmax(net,len(self._dims)),nonzero_idx)
       self._accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(nonzero_label,nonzero_pred),tf.float32))
@@ -61,7 +59,7 @@ class ssnet_base(object):
         self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=net)
         if self._use_weight:
           self._loss = tf.multiply(weight,self._loss)
-        self._train = tf.train.RMSPropOptimizer(0.0003).minimize(self._loss)
+        self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
 
       if len(self._dims) == 3:
