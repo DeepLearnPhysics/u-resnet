@@ -66,10 +66,12 @@ class ssnet_trainval(object):
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS,
+      self._net.construct(trainable=self._cfg.TRAIN,
+                          use_weight=self._cfg.USE_WEIGHTS,
                           learning_rate=self._cfg.LEARNING_RATE)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
+      self._net.construct(trainable=self._cfg.TRAIN,
+                          use_weight=self._cfg.USE_WEIGHTS)
 
     self._iteration = 0
 
