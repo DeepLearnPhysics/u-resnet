@@ -73,6 +73,8 @@ class ssnet_trainval(object):
     self._iteration = 0
 
   def run(self,sess):
+    # Set random seed for reproducibility
+    tf.set_random_seed(1234)
     # Configure global process (session, summary, etc.)
     # Create a bandle of summary
     merged_summary=tf.summary.merge_all()
