@@ -141,10 +141,17 @@ class ssnet_trainval(object):
         self._net.apply_gradients(sess)
 
         self._iteration += 1
-        msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
+        msg = 'Training in progress @ step %d loss %g accuracy %g / %g \n'
         msg = msg % (self._iteration,np.mean(batch_metrics, axis=0)[0],np.mean(batch_metrics, axis=0)[1],
                      np.mean(batch_metrics, axis=0)[2])
         sys.stdout.write(msg)
+        maxval, minval, meanval = self._net.stats(sess = sess, 
+                                                     input_data = minibatch_data,
+                                                     input_label = minibatch_label,
+                                                     input_weight = minibatch_weight)
+        debug = 'max %g, min %g, mean %g \n'
+        debug = debug % (np.squeeze(maxval), np.squeeze(minval), np.squeeze(meanval))
+        sys.stdout.write(debug)
         sys.stdout.flush()
 
       else:

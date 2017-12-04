@@ -50,13 +50,18 @@ class ssnet_base(object):
     self._accuracy_allpix = None
     self._accuracy_nonzero = None
 
+    self._max = [tf.reduce_max(net)]
+    self._min = [tf.reduce_min(net)]
+    self._mean = [tf.reduce_mean(net)]
+    #self._meanvar = [tf.nn.moments(net, axes=[1])]
+
     with tf.variable_scope('accum_grad'):
       self._accum_vars = [tf.Variable(tv.initialized_value(),
                                       trainable=False) for tv in tf.trainable_variables()]
 
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
-      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > 10.)
+      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > 0.)
       nonzero_label = tf.gather_nd(label,nonzero_idx)
       nonzero_pred  = tf.gather_nd(tf.argmax(net,len(self._dims)),nonzero_idx)
       self._accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(nonzero_label,nonzero_pred),tf.float32))
@@ -84,6 +89,13 @@ class ssnet_base(object):
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
 
+  def stats(self, sess, input_data, input_label, input_weight=None):
+    feed_dict = self.feed_dict(input_data = input_data, 
+                               input_label = input_label,
+                               input_weight = input_weight)
+
+    return sess.run([self._max, self._min, self._mean], feed_dict = feed_dict)
+
   def zero_gradients(self, sess):
     return sess.run([self._zero_gradients])
 
@@ -108,7 +120,6 @@ class ssnet_base(object):
 #    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
 #
 #    return sess.run( ops, feed_dict = feed_dict )
-
 
   def inference(self,sess,input_data,input_label=None):
     
