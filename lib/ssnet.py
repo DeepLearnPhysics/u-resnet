@@ -46,6 +46,10 @@ class ssnet_base(object):
     self._accuracy_allpix = None
     self._accuracy_nonzero = None
 
+    self._max = [tf.reduce_max(net)]
+    self._min = [tf.reduce_min(net)]
+    self._mean = [tf.reduce_mean(net)]
+
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
       nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > tf.to_float(0.))
@@ -88,6 +92,13 @@ class ssnet_base(object):
       ops.append(self._accuracy_nonzero)
 
     return sess.run( ops, feed_dict = feed_dict )
+
+  def stats(self, sess, input_data, input_label, input_weight=None):
+
+    feed_dict = self.feed_dict(input_data = input_data,
+                               input_label = input_label,
+                               input_weight = input_weight)
+    return sess.run([self._max, self._min, self._mean], feed_dict=feed_dict)
 
   def feed_dict(self,input_data,input_label=None,input_weight=None):
 

@@ -130,9 +130,16 @@ class ssnet_trainval(object):
                                                      input_label  = batch_label,
                                                      input_weight = batch_weight)
         self._iteration += 1
-        msg = 'Training in progress @ step %d loss %g accuracy %g / %g           \r'
+        msg = 'Training in progress @ step %d loss %g accuracy %g / %g \n'
         msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
         sys.stdout.write(msg)
+        maxval, minval, meanval = self._net.stats(sess = sess, 
+                                                  input_data = batch_data,
+                                                  input_label = batch_label,
+                                                  input_weight = batch_weight)
+        debug = 'max %g, min %g, mean %g \n'
+        debug = debug % (np.squeeze(maxval), np.squeeze(minval), np.squeeze(meanval))
+        sys.stdout.write(debug)
         sys.stdout.flush()
 
       else:
