@@ -23,17 +23,14 @@ class ssnet_base(object):
     self._use_weight = bool(use_weight)
     self._learning_rate = learning_rate
 
-    entry_size = 1
-    for dim in self._dims: 
-      entry_size *= dim
+    entry_size = np.prod(self._dims)
 
     with tf.variable_scope('input_prep'):
       self._input_data   = tf.placeholder(tf.float32, [None, entry_size], name='input_data'  )
       self._input_weight = tf.placeholder(tf.float32, [None, entry_size], name='input_weight')
       self._input_label  = tf.placeholder(tf.float32, [None, entry_size], name='input_label' )
       
-      shape_dim = [-1]
-      for dim in self._dims: shape_dim.append(dim)
+      shape_dim = np.insert(self._dims, 0, -1)
 
       data   = tf.reshape(self._input_data,   shape_dim,      name='data_reshape'  )
       label  = tf.reshape(self._input_label,  shape_dim[:-1], name='label_reshape' )
@@ -61,7 +58,7 @@ class ssnet_base(object):
 
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
-      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > 0.)
+      nonzero_idx = tf.where(tf.reshape(data, shape_dim[:-1]) > tf.to_float(0.))
       nonzero_label = tf.gather_nd(label,nonzero_idx)
       nonzero_pred  = tf.gather_nd(tf.argmax(net,len(self._dims)),nonzero_idx)
       self._accuracy_nonzero = tf.reduce_mean(tf.cast(tf.equal(nonzero_label,nonzero_pred),tf.float32))
