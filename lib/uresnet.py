@@ -115,7 +115,7 @@ class uresnet(ssnet_base):
                           stride      = 1,
                           trainable   = self._trainable,
                           normalizer_fn = None,
-                          activation_fn = tf.nn.relu,
+                          activation_fn = None,
                           scope       = 'conv2')
             if self._debug: print(net.shape, 'after conv2')
             return net

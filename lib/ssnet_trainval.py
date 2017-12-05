@@ -49,7 +49,7 @@ class ssnet_trainval(object):
                   'filler_cfg'  : self._cfg.FILLER_CONFIG}
     self._filler.configure(filler_cfg)
     # Start IO thread
-    self._filler.start_manager(self._cfg.BATCH_SIZE)
+    self._filler.start_manager(self._cfg.MINIBATCH_SIZE)
     # If requested, construct an output stream
     if self._cfg.DRAINER_CONFIG:
       self._drainer = larcv.IOManager(self._cfg.DRAINER_CONFIG)
@@ -66,9 +66,12 @@ class ssnet_trainval(object):
                         debug=False)
 
     if self._cfg.TRAIN:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
+      self._net.construct(trainable=self._cfg.TRAIN,
+                          use_weight=self._cfg.USE_WEIGHTS,
+                          learning_rate=self._cfg.LEARNING_RATE)
     else:
-      self._net.construct(trainable=self._cfg.TRAIN,use_weight=self._cfg.USE_WEIGHTS)
+      self._net.construct(trainable=self._cfg.TRAIN,
+                          use_weight=self._cfg.USE_WEIGHTS)
 
     self._iteration = 0
 
@@ -113,54 +116,66 @@ class ssnet_trainval(object):
       if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
         print('Finished training (iteration %d)' % self._iteration)
         break
-  
-      # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
-      batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
-      batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
-      batch_weight = None
+
       # Start IO thread for the next batch while we train the network
       if self._cfg.TRAIN:
-        if self._cfg.USE_WEIGHTS:
-          batch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
-          # perform per-event normalization
-          batch_weight /= (np.sum(batch_weight,axis=1).reshape([batch_weight.shape[0],1]))
-    
-        _,loss,acc_all,acc_nonzero = self._net.train(sess         = sess, 
-                                                     input_data   = batch_data,
-                                                     input_label  = batch_label,
-                                                     input_weight = batch_weight)
+        batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,3))
+        for j in xrange(self._cfg.NUM_MINIBATCHES):
+          self._net.zero_gradients(sess)
+          minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
+          minibatch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
+          minibatch_weight = None
+          if self._cfg.USE_WEIGHTS:
+            minibatch_weight = self._filler.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+            # perform per-event normalization
+            minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
+
+          _,loss,acc_all,acc_nonzero = self._net.accum_gradients(sess         = sess,
+                                                                 input_data   = minibatch_data,
+                                                                 input_label  = minibatch_label,
+                                                                 input_weight = minibatch_weight)
+          batch_metrics[j,0] = loss
+          batch_metrics[j,1] = acc_all
+          batch_metrics[j,2] = acc_nonzero
+        #update
+        self._net.apply_gradients(sess)
+
         self._iteration += 1
         msg = 'Training in progress @ step %d loss %g accuracy %g / %g \n'
-        msg = msg % (self._iteration,loss,acc_all,acc_nonzero)
+        msg = msg % (self._iteration,np.mean(batch_metrics, axis=0)[0],np.mean(batch_metrics, axis=0)[1],
+                     np.mean(batch_metrics, axis=0)[2])
         sys.stdout.write(msg)
         maxval, minval, meanval = self._net.stats(sess = sess, 
-                                                  input_data = batch_data,
-                                                  input_label = batch_label,
-                                                  input_weight = batch_weight)
+                                                     input_data = minibatch_data,
+                                                     input_label = minibatch_label,
+                                                     input_weight = minibatch_weight)
         debug = 'max %g, min %g, mean %g \n'
         debug = debug % (np.squeeze(maxval), np.squeeze(minval), np.squeeze(meanval))
         sys.stdout.write(debug)
         sys.stdout.flush()
 
       else:
+        # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
+        batch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
+        batch_label  = self._filler.fetch_data(self._cfg.KEYWORD_LABEL).data()
+        batch_weight = None
+
         softmax,acc_all,acc_nonzero = self._net.inference(sess        = sess,
                                                           input_data  = batch_data,
                                                           input_label = batch_label)
         print('Inference accuracy:', acc_all, '/', acc_nonzero)
 
         if self._drainer:
-
+          for entry in xrange(len(softmax)):
+            self._drainer.read_entry(entry)
+            data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
           entries   = self._filler.fetch_entries()
           event_ids = self._filler.fetch_event_ids()
 
           for entry in xrange(len(softmax)):
 
-            print(entries[entry])
-            print( event_ids[entry])
-
-            self._drainer.read_entry(entry)
+            self._drainer.read_entry(entries[entry])
             data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
-            print(data.event_key())
             label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])          
             shower_score = softmax[entry,:,:,:,1]
             track_score  = softmax[entry,:,:,:,2]
@@ -184,6 +199,7 @@ class ssnet_trainval(object):
             #  vox = vs.as_vector()[vs_index]
             #  sparse3d.add(vs.as_vector()[vs_index])
             sparse3d.set(vs,data.meta())
+            #print(data.event_key())
             self._drainer.save_entry()
             #self._drainer.clear_entry()
         
@@ -212,9 +228,9 @@ class ssnet_trainval(object):
       # Save log
       if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
         # Run summary
-        feed_dict = self._net.feed_dict(input_data   = batch_data,
-                                        input_label  = batch_label,
-                                        input_weight = batch_weight)
+        feed_dict = self._net.feed_dict(input_data   = minibatch_data,
+                                        input_label  = minibatch_label,
+                                        input_weight = minibatch_weight)
         writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
   
       # Save snapshot
@@ -226,9 +242,6 @@ class ssnet_trainval(object):
 
       self._filler.next(store_entries   = (not self._cfg.TRAIN),
                         store_event_ids = (not self._cfg.TRAIN))
-
-
-
 
     self._filler.reset()
     self._drainer.finalize()

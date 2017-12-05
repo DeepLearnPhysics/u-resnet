@@ -13,7 +13,10 @@ class ssnet_config:
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
     AVOID_LOAD_PARAMS = []
+    LEARNING_RATE     = -1
     BATCH_SIZE        = 10
+    MINIBATCH_SIZE    = 10
+    NUM_MINIBATCHES   = 5
     ITERATIONS        = 100000
     DUMP_IMAGE        = False
     TRAIN             = True
@@ -49,7 +52,7 @@ class ssnet_config:
             valid=False
 
             exec('valid = (type(self.%s) == type(%s))' % (words[0],words[1]))
-            if not valid:
+            if line.split()[0] != 'LEARNING_RATE' and not valid:
                 print('Incompatible type: %s' % line)
                 raise TypeError
                 

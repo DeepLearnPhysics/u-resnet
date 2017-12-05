@@ -17,10 +17,11 @@ class ssnet_base(object):
   def _build(self,input_tensor):
     raise NotImplementedError
 
-  def construct(self,trainable=True,use_weight=True):
+  def construct(self,trainable=True,use_weight=True, learning_rate=None):
 
     self._trainable  = bool(trainable)
     self._use_weight = bool(use_weight)
+    self._learning_rate = learning_rate
 
     entry_size = np.prod(self._dims)
 
@@ -29,14 +30,14 @@ class ssnet_base(object):
       self._input_weight = tf.placeholder(tf.float32, [None, entry_size], name='input_weight')
       self._input_label  = tf.placeholder(tf.float32, [None, entry_size], name='input_label' )
       
-      shape_dim = [-1]
-      for dim in self._dims: shape_dim.append(dim)
+      shape_dim = np.insert(self._dims, 0, -1)
 
       data   = tf.reshape(self._input_data,   shape_dim,      name='data_reshape'  )
       label  = tf.reshape(self._input_label,  shape_dim[:-1], name='label_reshape' )
       weight = tf.reshape(self._input_weight, shape_dim[:-1], name='weight_reshape')
 
       label = tf.cast(label,tf.int64)
+
       
     net = self._build(input_tensor=data)
 
@@ -49,6 +50,11 @@ class ssnet_base(object):
     self._max = [tf.reduce_max(net)]
     self._min = [tf.reduce_min(net)]
     self._mean = [tf.reduce_mean(net)]
+    #self._meanvar = [tf.nn.moments(net, axes=[1])]
+
+    with tf.variable_scope('accum_grad'):
+      self._accum_vars = [tf.Variable(tv.initialized_value(),
+                                      trainable=False) for tv in tf.trainable_variables()]
 
     with tf.variable_scope('metrics'):
       self._accuracy_allpix = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(net,len(self._dims)), label),tf.float32))
@@ -63,24 +69,54 @@ class ssnet_base(object):
         self._loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label, logits=net)
         if self._use_weight:
           self._loss = tf.multiply(weight,self._loss)
-        self._train = tf.train.AdamOptimizer().minimize(self._loss)
+        #self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
+        if self._learning_rate == -1:
+          opt = tf.train.AdamOptimizer()
+        else:
+          opt = tf.train.AdamOptimizer(self._learning_rate)
+        self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
+        self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
+                                 i, gv in enumerate(opt.compute_gradients(self._loss))]
+        self._apply_gradients = opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
 
       if len(self._dims) == 3:
-        tf.summary.image('data_example',data,10)
+        tf.summary.image('data_example',tf.image.grayscale_to_rgb(data,'gray_to_rgb'),10)
       tf.summary.scalar('accuracy_all', self._accuracy_allpix)
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
 
-  def train(self,sess,input_data,input_label,input_weight=None):
-
-    feed_dict = self.feed_dict(input_data   = input_data,
-                               input_label  = input_label,
+  def stats(self, sess, input_data, input_label, input_weight=None):
+    feed_dict = self.feed_dict(input_data = input_data, 
+                               input_label = input_label,
                                input_weight = input_weight)
 
-    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
+    return sess.run([self._max, self._min, self._mean], feed_dict = feed_dict)
 
-    return sess.run( ops, feed_dict = feed_dict )
+  def zero_gradients(self, sess):
+    return sess.run([self._zero_gradients])
+
+  def accum_gradients(self, sess, input_data, input_label, input_weight=None):
+
+    feed_dict = self.feed_dict(input_data  = input_data,
+                               input_label  = input_label,
+                               input_weight = input_weight)
+    
+    return sess.run([self._accum_gradients, self._loss, self._accuracy_allpix, self._accuracy_nonzero], feed_dict = feed_dict )
+
+  def apply_gradients(self,sess):
+
+    return sess.run( [self._apply_gradients], feed_dict = {})
+
+#  def train(self,sess,input_data,input_label,input_weight=None):
+#
+#    feed_dict = self.feed_dict(input_data   = input_data,
+#                               input_label  = input_label,
+#                               input_weight = input_weight)
+#
+#    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
+#
+#    return sess.run( ops, feed_dict = feed_dict )
 
   def inference(self,sess,input_data,input_label=None):
     
