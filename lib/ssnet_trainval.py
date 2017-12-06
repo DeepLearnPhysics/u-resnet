@@ -59,7 +59,7 @@ class ssnet_trainval(object):
     self._filler.next(store_entries   = (not self._cfg.TRAIN),
                       store_event_ids = (not self._cfg.TRAIN))
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
-    dims = []
+    #dims = []
     self._net = uresnet(dims = dim_data[1:],
                         num_class = self._cfg.NUM_CLASS, 
                         base_num_outputs = self._cfg.BASE_NUM_FILTERS, 
@@ -161,15 +161,26 @@ class ssnet_trainval(object):
           if batch_metrics is None:
             batch_metrics = np.zeros((self._cfg.NUM_MINIBATCHES,len(res)-1),dtype=np.float32)
             descr_metrics = doc[1:]
-          batch_metrics[j,:] = res[1:]
+            batch_metrics[j,:] = res[1:]
+
+          if (j+1) == self._cfg.NUM_MINIBATCHES and  self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
+          # Run summary                                                                                                                                                             
+            feed_dict = self._net.feed_dict(input_data          = minibatch_data,
+                                            input_class_label   = minibatch_class_label,
+                                            input_class_weight  = minibatch_class_weight,
+                                            input_vertex_label  = minibatch_vertex_label,
+                                            input_vertex_weight = minibatch_vertex_weight)
+
+            writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
+
           self._filler.next(store_entries   = (not self._cfg.TRAIN),
                             store_event_ids = (not self._cfg.TRAIN))
         #update
         self._net.apply_gradients(sess)
-
         self._iteration += 1
         self._report(self._iteration,np.mean(batch_metrics,axis=0),descr_metrics)
 
+        '''
         # Save log
         if self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
           # Run summary
@@ -180,13 +191,15 @@ class ssnet_trainval(object):
                                           input_vertex_weight = minibatch_vertex_weight)
                                         
           writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
-  
+        '''
         # Save snapshot
         if self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
           # Save snapshot
           ssf_path = saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
           print()
           print('saved @',ssf_path)
+
+        #self._filler.next(store_entries   = (not self._cfg.TRAIN), store_event_ids = (not self._cfg.TRAIN))     
 
       else:
         # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
