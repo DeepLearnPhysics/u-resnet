@@ -19,7 +19,10 @@ class ssnet_config:
     NUM_MINIBATCHES   = 5
     ITERATIONS        = 100000
     DUMP_IMAGE        = False
-    TRAIN             = True
+    #TRAIN             = True
+    FREEZE_BASE       = False
+    FREEZE_CLASS      = False
+    FREEZE_VERTEX     = True
     USE_WEIGHTS       = True
     CHECKPOINT_STEPS  = 200
     SUMMARY_STEPS     = 20

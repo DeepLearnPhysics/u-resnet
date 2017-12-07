@@ -23,6 +23,10 @@ class ssnet_trainval(object):
     self._filler = None
     self._drainer = None
     self._iteration = -1
+    # SUCK IT
+    self._freeze_all = self._cfg.FREEZE_BASE and self._cfg.FREEZE_CLASS
+    if self._cfg.PREDICT_VERTEX:
+      self._freeze_all = self._freeze_all and self._cfg.FREEZE_VERTEX
 
   def __del__(self):
     if self._filler:
@@ -36,6 +40,10 @@ class ssnet_trainval(object):
   def override_config(self,file_name):
     self._cfg.override(file_name)
     self._cfg.dump()
+    # SUCK IT
+    self._freeze_all = self._cfg.FREEZE_BASE and self._cfg.FREEZE_CLASS
+    if self._cfg.PREDICT_VERTEX:
+      self._freeze_all = self._freeze_all and self._cfg.FREEZE_VERTEX
 
   def initialize(self):
     # Instantiate and configure
@@ -56,8 +64,8 @@ class ssnet_trainval(object):
       self._drainer.initialize()
 
     # Retrieve image/label dimensions
-    self._filler.next(store_entries   = (not self._cfg.TRAIN),
-                      store_event_ids = (not self._cfg.TRAIN))
+    self._filler.next(store_entries   = self._freeze_all,
+                      store_event_ids = self._freeze_all)
     dim_data = self._filler.fetch_data(self._cfg.KEYWORD_DATA).dim()
     #dims = []
     self._net = uresnet(dims = dim_data[1:],
@@ -65,15 +73,12 @@ class ssnet_trainval(object):
                         base_num_outputs = self._cfg.BASE_NUM_FILTERS, 
                         debug = False)
 
-    if self._cfg.TRAIN:
-      self._net.construct(trainable      = self._cfg.TRAIN,
-                          use_weight     = self._cfg.USE_WEIGHTS,
-                          learning_rate  = self._cfg.LEARNING_RATE,
-                          predict_vertex = self._cfg.PREDICT_VERTEX)
-    else:
-      self._net.construct(trainable      = self._cfg.TRAIN,
-                          use_weight     = self._cfg.USE_WEIGHTS,
-                          predict_vertex = self._cfg.PREDICT_VERTEX)
+    # define freeze-layer config
+    freeze = (self._cfg.FREEZE_BASE, self._cfg.FREEZE_CLASS, self._cfg.FREEZE_VERTEX)
+    self._net.construct(freeze         = freeze,
+                        use_weight     = self._cfg.USE_WEIGHTS,
+                        learning_rate  = self._cfg.LEARNING_RATE,
+                        predict_vertex = self._cfg.PREDICT_VERTEX)
 
     self._iteration = 0
 
@@ -108,28 +113,25 @@ class ssnet_trainval(object):
     if self._cfg.LOAD_FILE:
       vlist=[]
       self._iteration = self.iteration_from_file_name(self._cfg.LOAD_FILE)
-      parent_vlist = []
-      if self._cfg.TRAIN: 
-        parent_vlist = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-      else:
-        parent_vlist = tf.get_collection(tf.GraphKeys.MODEL_VARIABLES)
+      parent_vlist = tf.get_collection(tf.GraphKeys.MODEL_VARIABLES)
       for v in parent_vlist:
         if v.name in self._cfg.AVOID_LOAD_PARAMS:
           print('\033[91mSkipping\033[00m loading variable',v.name,'from input weight...')
           continue
         print('\033[95mLoading\033[00m variable',v.name,'from',self._cfg.LOAD_FILE)
         vlist.append(v)
+      for v in vlist: print( v)
       reader=tf.train.Saver(var_list=vlist)
       reader.restore(sess,self._cfg.LOAD_FILE)
     
     # Run iterations
     for i in xrange(self._cfg.ITERATIONS):
-      if self._cfg.TRAIN and self._iteration >= self._cfg.ITERATIONS:
+      if not self._freeze_all and self._iteration >= self._cfg.ITERATIONS:
         print('Finished training (iteration %d)' % self._iteration)
         break
 
       # Start IO thread for the next batch while we train the network
-      if self._cfg.TRAIN:
+      if not self._freeze_all:
         batch_metrics = None
         descr_metrics = None
         for j in xrange(self._cfg.NUM_MINIBATCHES):
@@ -173,8 +175,8 @@ class ssnet_trainval(object):
 
             writer.add_summary(sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
 
-          self._filler.next(store_entries   = (not self._cfg.TRAIN),
-                            store_event_ids = (not self._cfg.TRAIN))
+          self._filler.next(store_entries   = self._freeze_all,
+                            store_event_ids = self._freeze_all)
         #update
         self._net.apply_gradients(sess)
         self._iteration += 1
@@ -199,7 +201,7 @@ class ssnet_trainval(object):
           print()
           print('saved @',ssf_path)
 
-        #self._filler.next(store_entries   = (not self._cfg.TRAIN), store_event_ids = (not self._cfg.TRAIN))     
+        #self._filler.next(store_entries   = self._freeze_all, store_event_ids = self._freeze_all)     
 
       else:
         # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
@@ -274,8 +276,8 @@ class ssnet_trainval(object):
             plt.imshow((track_image * 255.).astype(np.uint8),vmin=0,vmax=255,cmap='jet',interpolation='none').write_png(track_image_name)
             plt.close()
 
-        self._filler.next(store_entries   = (not self._cfg.TRAIN),
-                          store_event_ids = (not self._cfg.TRAIN))
+        self._filler.next(store_entries   = self._freeze_all,
+                          store_event_ids = self._freeze_all)
 
     self._filler.reset()
     self._drainer.finalize()

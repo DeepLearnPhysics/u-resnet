@@ -21,28 +21,21 @@ class uresnet(ssnet_base):
     def _build(self,input_tensor):
         
         if self._debug: print(input_tensor.shape, 'input shape')
-        # figure out 2d or 3d
-        fn_conv = slim.conv2d
-        fn_conv_transpose = slim.conv2d_transpose
-        if len(input_tensor.shape) == 5:
-            #print('\033[93m 3D!\033[00m')
-            fn_conv = slim.conv3d
-            fn_conv_transpose = slim.conv3d_transpose
 
         with tf.variable_scope('UResNet'):
 
             conv_feature_map={}
 
             # assume zero padding in each layer (set as default in uresnet_layers.py)
-            net = fn_conv(inputs      = input_tensor,
-                          num_outputs = self._base_num_outputs,
-                          kernel_size = 7,
-                          stride      = 1,
-                          trainable   = self._trainable,
-                          normalizer_fn = None,
-                          activation_fn = tf.nn.relu,
-                          padding     = 'same',
-                          scope       = 'conv0')
+            net = self._fn_conv(inputs      = input_tensor,
+                                num_outputs = self._base_num_outputs,
+                                kernel_size = 7,
+                                stride      = 1,
+                                trainable   = not self._freeze_base,
+                                normalizer_fn = None,
+                                activation_fn = tf.nn.relu,
+                                padding     = 'same',
+                                scope       = 'conv0')
 
             conv_feature_map[net.get_shape()[-1].value] = net
 
@@ -56,7 +49,7 @@ class uresnet(ssnet_base):
             for step in xrange(self._num_strides):
                 net = double_resnet(input_tensor = net, 
                                     num_outputs  = net.get_shape()[-1].value * 2,
-                                    trainable    = self._trainable,
+                                    trainable    = not self._freeze_base,
                                     kernel       = 3,
                                     stride       = 2,
                                     scope        = 'resnet_module%d' % step)
@@ -65,25 +58,25 @@ class uresnet(ssnet_base):
             # Decoding steps
             for step in xrange(self._num_strides):
                 num_outputs = net.get_shape()[-1].value / 2
-                if fn_conv_transpose == slim.conv2d_transpose:
-                    net = fn_conv_transpose(inputs      = net,
-                                            num_outputs = num_outputs,
-                                            kernel_size = 3,
-                                            stride      = 2,
-                                            padding     = 'same',
-                                            activation_fn = None,
-                                            trainable   = self._trainable,
-                                            scope       = 'deconv%d' % step)
+                if self._fn_conv_transpose == slim.conv2d_transpose:
+                    net = self._fn_conv_transpose(inputs      = net,
+                                                  num_outputs = num_outputs,
+                                                  kernel_size = 3,
+                                                  stride      = 2,
+                                                  padding     = 'same',
+                                                  activation_fn = None,
+                                                  trainable   = not self._freeze_base,
+                                                  scope       = 'deconv%d' % step)
                 else:
-                    net = fn_conv_transpose(inputs      = net,
-                                            num_outputs = num_outputs,
-                                            kernel_size = 3,
-                                            stride      = 2,
-                                            padding     = 'same',
-                                            activation_fn = None,
-                                            trainable   = self._trainable,
-                                            scope       = 'deconv%d' % step,
-                                            biases_initializer = None)
+                    net = self._fn_conv_transpose(inputs      = net,
+                                                  num_outputs = num_outputs,
+                                                  kernel_size = 3,
+                                                  stride      = 2,
+                                                  padding     = 'same',
+                                                  activation_fn = None,
+                                                  trainable   = not self._freeze_base,
+                                                  scope       = 'deconv%d' % step,
+                                                  biases_initializer = None)
 
                 if self._debug: print(net.shape, 'after deconv%d' % step)
                 net = tf.concat([net, conv_feature_map[num_outputs]],
@@ -92,33 +85,23 @@ class uresnet(ssnet_base):
                 if self._debug: print(net.shape, 'after concat%d' % step)
                 net = double_resnet(input_tensor = net, 
                                     num_outputs  = num_outputs,
-                                    trainable    = self._trainable,
+                                    trainable    = not self._freeze_base,
                                     kernel       = 3,
                                     stride       = 1,
                                     scope        = 'resnet_module%d' % (step+5))
                 if self._debug: print(net.shape, 'after resnet_module%d' % (step + self._num_strides))
             # Final conv layers
-            net = fn_conv(inputs      = net,
-                          num_outputs = self._base_num_outputs,
-                          padding     = 'same',
-                          kernel_size = 7,
-                          stride      = 1,
-                          trainable   = self._trainable,
-                          normalizer_fn = None,
-                          activation_fn = tf.nn.relu,
-                          scope       = 'conv1')
+            net = self._fn_conv(inputs      = net,
+                                num_outputs = self._base_num_outputs,
+                                padding     = 'same',
+                                kernel_size = 7,
+                                stride      = 1,
+                                trainable   = not self._freeze_base,
+                                normalizer_fn = None,
+                                activation_fn = tf.nn.relu,
+                                scope       = 'conv1')
             if self._debug: print(net.shape, 'after conv1')
 
-            net = fn_conv(inputs      = net,
-                          num_outputs = self._final_num_outputs,
-                          padding     = 'same',
-                          kernel_size = 3,
-                          stride      = 1,
-                          trainable   = self._trainable,
-                          normalizer_fn = None,
-                          activation_fn = None,
-                          scope       = 'conv2')
-            if self._debug: print(net.shape, 'after conv2')
             return net
 
 if __name__ == '__main__':
@@ -135,7 +118,7 @@ if __name__ == '__main__':
     net = uresnet(dims=dims,
                   num_class=NUM_CLASS,
                   debug=True)
-    net.construct(trainable=True,use_weight=True,predict_vertex=predict_vertex)
+    net.construct(freeze=(False,False,False),use_weight=True,predict_vertex=predict_vertex)
 
     import sys
     if 'save' in sys.argv:
