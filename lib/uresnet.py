@@ -118,7 +118,7 @@ if __name__ == '__main__':
     net = uresnet(dims=dims,
                   num_class=NUM_CLASS,
                   debug=True)
-    net.construct(freeze=(False,False,False),use_weight=True,predict_vertex=predict_vertex)
+    net.construct(freeze=(True,True,False),use_weight=True,predict_vertex=predict_vertex)
 
     import sys
     if 'save' in sys.argv:

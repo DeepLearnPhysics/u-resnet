@@ -92,7 +92,7 @@ class ssnet_base(object):
     if self._predict_vertex:
       # define net
       head_vertex = self._fn_conv(inputs      = net,
-                                  num_outputs = 8, 
+                                  num_outputs = 16, 
                                   padding     = 'same',
                                   kernel_size = 3,
                                   stride      = 1,
@@ -101,7 +101,18 @@ class ssnet_base(object):
                                   activation_fn = tf.nn.relu,
                                   scope       = 'vertex_conv0')
       if self._debug: print(head_vertex.shape, 'after vertex_conv0 layer')
-
+      
+      head_vertex = self._fn_conv(inputs      = head_vertex,
+                                  num_outputs = 8,
+                                  padding     = 'same',
+                                  kernel_size = 3,
+                                  stride      = 1,
+                                  trainable   = not self._freeze_vertex,
+                                  normalizer_fn = None,
+                                  activation_fn = tf.nn.relu,
+                                  scope       = 'vertex_conv1')
+      if self._debug: print(head_vertex.shape, 'after vertex_conv1 layer')
+      
       head_vertex = self._fn_conv(inputs = head_vertex,
                                   num_outputs = 1,
                                   padding     = 'same',
