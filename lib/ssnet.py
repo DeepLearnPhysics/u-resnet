@@ -82,6 +82,7 @@ class ssnet_base(object):
 
       if len(self._dims) == 3:
         tf.summary.image('data_example',tf.image.grayscale_to_rgb(data,'gray_to_rgb'),10)
+
       tf.summary.scalar('accuracy_all', self._accuracy_allpix)
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
@@ -94,29 +95,26 @@ class ssnet_base(object):
     return sess.run([self._max, self._min, self._mean], feed_dict = feed_dict)
 
   def zero_gradients(self, sess):
+
     return sess.run([self._zero_gradients])
 
   def accum_gradients(self, sess, input_data, input_label, input_weight=None):
 
-    feed_dict = self.feed_dict(input_data  = input_data,
+    feed_dict = self.feed_dict(input_data   = input_data,
                                input_label  = input_label,
                                input_weight = input_weight)
+
+    ops = [self._accum_gradients]
+    doc = ['']
+    # classification
+    ops += [self._loss, self._accuracy_allpix, self._accuracy_nonzero]
+    doc += ['loss', 'acc. all', 'acc. nonzero']
     
-    return sess.run([self._accum_gradients, self._loss, self._accuracy_allpix, self._accuracy_nonzero], feed_dict = feed_dict )
+    return sess.run(ops, feed_dict = feed_dict ), doc
 
   def apply_gradients(self,sess):
 
     return sess.run( [self._apply_gradients], feed_dict = {})
-
-#  def train(self,sess,input_data,input_label,input_weight=None):
-#
-#    feed_dict = self.feed_dict(input_data   = input_data,
-#                               input_label  = input_label,
-#                               input_weight = input_weight)
-#
-#    ops = [self._train,self._loss,self._accuracy_allpix,self._accuracy_nonzero]
-#
-#    return sess.run( ops, feed_dict = feed_dict )
 
   def inference(self,sess,input_data,input_label=None):
     

@@ -14,6 +14,6 @@ for argv in sys.argv:
 
 t.initialize()
 
-sess = tf.InteractiveSession() 
+t.batch_process()
 
-t.run(sess=sess)
+t.reset()
