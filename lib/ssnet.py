@@ -87,6 +87,17 @@ class ssnet_base(object):
       tf.summary.scalar('accuracy_nonzero', self._accuracy_nonzero)
       tf.summary.scalar('loss',self._loss)
 
+      # Create a bandle of summary
+      self._merged_summary=tf.summary.merge_all()
+
+  def make_summary(self, sess, input_data, input_label, input_weight=None):
+
+    feed_dict = self.feed_dict(input_data   = input_data,
+                               input_label  = input_label,
+                               input_weight = input_weight)
+
+    return sess.run(self._merged_summary,feed_dict=feed_dict)
+
   def stats(self, sess, input_data, input_label, input_weight=None):
     feed_dict = self.feed_dict(input_data = input_data, 
                                input_label = input_label,

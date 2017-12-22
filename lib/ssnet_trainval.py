@@ -105,18 +105,21 @@ class ssnet_trainval(object):
     # Set random seed for reproducibility
     tf.set_random_seed(self._cfg.TF_RANDOM_SEED)
     # Configure global process (session, summary, etc.)
-    # Create a bandle of summary
-    merged_summary=tf.summary.merge_all()
     # Initialize variables
     self._sess = tf.InteractiveSession()
     self._sess.run(tf.global_variables_initializer())
     self._writer = None
     if self._cfg.LOGDIR:
+      if not os.path.isdir(self._cfg.LOGDIR):
+        os.makedirs(self._cfg.LOGDIR)
       # Create a summary writer handle
       self._writer=tf.summary.FileWriter(self._cfg.LOGDIR)
       self._writer.add_graph(self._sess.graph)
     saver = None
     if self._cfg.SAVE_FILE:
+      save_dir = self._cfg.SAVE_FILE[0:self._cfg.SAVE_FILE.rfind('/')]
+      if save_dir and not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
       # Create weights saver
       self._saver = tf.train.Saver()
       
@@ -199,16 +202,16 @@ class ssnet_trainval(object):
     # Save log
     if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
       # Run summary
-      feed_dict = self._net.feed_dict(input_data   = minibatch_data,
-                                      input_label  = minibatch_label,
-                                      input_weight = minibatch_weight)
-      self._writer.add_summary(self._sess.run(merged_summary,feed_dict=feed_dict),self._iteration)
+      self._writer.add_summary(self._net.make_summary(self._sess, 
+                                                      minibatch_data, 
+                                                      minibatch_label, 
+                                                      minibatch_weight),
+                               self._iteration)
   
     # Save snapshot
     if self._cfg.TRAIN and self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
       # Save snapshot
-      ssf_path = self._saver.save(sess,self._cfg.SAVE_FILE,global_step=self._iteration)
-      print()
+      ssf_path = self._saver.save(self._sess,self._cfg.SAVE_FILE,global_step=self._iteration)
       print('saved @',ssf_path)
 
   def ana_step(self):
