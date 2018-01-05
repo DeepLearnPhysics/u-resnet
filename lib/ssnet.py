@@ -71,7 +71,7 @@ class ssnet_base(object):
           self._loss = tf.multiply(weight,self._loss)
         #self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
-        if self._learning_rate == -1:
+        if self._learning_rate <= 0:
           opt = tf.train.AdamOptimizer()
         else:
           opt = tf.train.AdamOptimizer(self._learning_rate)
@@ -126,6 +126,15 @@ class ssnet_base(object):
   def apply_gradients(self,sess):
 
     return sess.run( [self._apply_gradients], feed_dict = {})
+
+  def run_test(self,sess, input_data, input_label, input_weight=None):
+    feed_dict = self.feed_dict(input_data   = input_data,
+                               input_label  = input_label,
+                               input_weight = input_weight)
+
+    ops = [self._loss, self._accuracy_allpix, self._accuracy_nonzero]
+    doc = ['loss', 'acc. all', 'acc. nonzero']
+    return sess.run(ops, feed_dict = feed_dict ), doc
 
   def inference(self,sess,input_data,input_label=None):
     

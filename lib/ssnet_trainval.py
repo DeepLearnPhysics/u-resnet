@@ -4,9 +4,6 @@ from __future__ import print_function
 
 # Basic imports
 import os,sys,time
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import numpy as np
 
 # Import more libraries (after configuration is validated)
@@ -26,13 +23,10 @@ class ssnet_trainval(object):
     self._iteration  = -1
 
   def __del__(self):
-    if self._input_main:
-      self._input_main.reset()
-    if self._output:
-      self._output.finalize()
+    self.reset()
 
-  def _report(self,step,metrics,descr):
-    msg = 'Training in progress @ step %-4d ... ' % step
+  def _report(self,metrics,descr):
+    msg = ''
     for i,desc in enumerate(descr):
       if not desc: continue
       msg += '%s=%6.6f   ' % (desc,metrics[i])
@@ -58,7 +52,7 @@ class ssnet_trainval(object):
     #
     # Main input stream
     self._input_main = larcv_threadio()
-    filler_cfg = {'filler_name' : 'ThreadProcessor',
+    filler_cfg = {'filler_name' : 'MainIO',
                   'verbosity'   : 0, 
                   'filler_cfg'  : self._cfg.MAIN_INPUT_CONFIG}
     self._input_main.configure(filler_cfg)
@@ -67,7 +61,7 @@ class ssnet_trainval(object):
     # Test input stream (optional)
     if self._cfg.TEST_INPUT_CONFIG:
       self._input_test = larcv_threadio()
-      filler_cfg = {'filler_name' : 'ThreadProcessor',
+      filler_cfg = {'filler_name' : 'TestIO',
                     'verbosity'   : 0,
                     'filler_cfg'  : self._cfg.TEST_INPUT_CONFIG}
       self._input_test.configure(filler_cfg)
@@ -108,13 +102,21 @@ class ssnet_trainval(object):
     # Initialize variables
     self._sess = tf.InteractiveSession()
     self._sess.run(tf.global_variables_initializer())
-    self._writer = None
+    self._writer_train = None
+    self._writer_test = None
     if self._cfg.LOGDIR:
-      if not os.path.isdir(self._cfg.LOGDIR):
-        os.makedirs(self._cfg.LOGDIR)
+      logdir = os.path.join(self._cfg.LOGDIR,'train')
+      if not os.path.isdir(logdir):
+        os.makedirs(logdir)
       # Create a summary writer handle
-      self._writer=tf.summary.FileWriter(self._cfg.LOGDIR)
-      self._writer.add_graph(self._sess.graph)
+      self._writer_train=tf.summary.FileWriter(logdir)
+      self._writer_train.add_graph(self._sess.graph)
+      if self._input_test:
+        logdir = os.path.join(self._cfg.LOGDIR,'test')
+        if not os.path.isdir(logdir):
+          os.makedirs(logdir)
+        self._writer_test=tf.summary.FileWriter(logdir)
+        self._writer_test.add_graph(self._sess.graph)
     saver = None
     if self._cfg.SAVE_FILE:
       save_dir = self._cfg.SAVE_FILE[0:self._cfg.SAVE_FILE.rfind('/')]
@@ -144,29 +146,24 @@ class ssnet_trainval(object):
 
   def train_step(self):
 
+    self._iteration += 1
+    report_step  = self._iteration % self._cfg.REPORT_STEPS == 0
+    summary_step = self._cfg.SUMMARY_STEPS and (self._iteration % self._cfg.SUMMARY_STEPS) == 0
+    checkpt_step = self._cfg.CHECKPOINT_STEPS and (self._iteration % self._cfg.CHECKPOINT_STEPS) == 0
+
     # Nullify the gradients
     self._net.zero_gradients(self._sess)
-
     # Loop over minibatches
     for j in xrange(self._cfg.NUM_MINIBATCHES):
       minibatch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
       minibatch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
-      if self._cfg.DEBUG:
-        print("min/max/mean for data ({}/{}/{}) and label ({}/{}/{})".format( minibatch_data.min(),
-                                                                              minibatch_data.max(),
-                                                                              minibatch_data.mean(),
-                                                                              minibatch_label.min(),
-                                                                              minibatch_label.max(),
-                                                                              minibatch_label.mean() )
-            )
-
       minibatch_weight = None
       if self._cfg.USE_WEIGHTS:
         minibatch_weight = self._input_main.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
         # perform per-event normalization
         minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
 
-      # train 
+      # compute gradients
       res,doc = self._net.accum_gradients(sess         = self._sess,
                                           input_data   = minibatch_data,
                                           input_label  = minibatch_label,
@@ -195,34 +192,62 @@ class ssnet_trainval(object):
       sys.stdout.write(debug)
       sys.stdout.flush()
 
+    # read-in test data set if needed
+    (test_data, test_label, test_weight) = (None,None,None)
+    if (report_step or summary_step) and self._input_test:
+        self._input_test.next()
+        test_data   = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_DATA).data()
+        test_label  = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_LABEL).data()
+        test_weight = None
+        if self._cfg.USE_WEIGHTS:
+          test_weight = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_WEIGHT).data()
+          # perform per-event normalization
+          test_weight /= (np.sum(test_weight,axis=1).reshape([test_weight.shape[0],1]))      
+
     # Report
-    if (self._iteration+1) % self._cfg.REPORT_STEPS == 0:
-      self._report(self._iteration,np.mean(self._batch_metrics,axis=0),self._descr_metrics)
+    if report_step:
+      sys.stdout.write('@ iteration {}\n'.format(self._iteration))
+      sys.stdout.write('Train set: ')
+      self._report(np.mean(self._batch_metrics,axis=0),self._descr_metrics)
+      if self._input_test:
+        res,doc = self._net.run_test(self._sess, test_data, test_label, test_weight)
+        sys.stdout.write('Test set: ')
+        self._report(res,doc)
 
     # Save log
-    if self._cfg.TRAIN and self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
+    if summary_step:
       # Run summary
-      self._writer.add_summary(self._net.make_summary(self._sess, 
-                                                      minibatch_data, 
-                                                      minibatch_label, 
-                                                      minibatch_weight),
-                               self._iteration)
+      self._writer_train.add_summary(self._net.make_summary(self._sess, 
+                                                            minibatch_data, 
+                                                            minibatch_label, 
+                                                            minibatch_weight),
+                                     self._iteration)
+      if self._writer_test:
+        self._writer_test.add_summary(self._net.make_summary(self._sess, test_data, test_label, test_weight),
+                                      self._iteration)
   
     # Save snapshot
-    if self._cfg.TRAIN and self._cfg.CHECKPOINT_STEPS and ((self._iteration+1)%self._cfg.CHECKPOINT_STEPS) == 0:
+    if checkpt_step:
       # Save snapshot
       ssf_path = self._saver.save(self._sess,self._cfg.SAVE_FILE,global_step=self._iteration)
       print('saved @',ssf_path)
 
+  def ana(self,input_data, input_label=None):
+
+    return  self._net.inference(sess        = self._sess,
+                                input_data  = input_data,
+                                input_label = input_label)    
+
   def ana_step(self):
+    
+    self._iteration += 1
 
     # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
     batch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
     batch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
     batch_weight = None
-    softmax,acc_all,acc_nonzero = self._net.inference(sess        = self._sess,
-                                                      input_data  = batch_data,
-                                                      input_label = batch_label)    
+    softmax,acc_all,acc_nonzero = self.ana(input_data  = batch_data,
+                                           input_label = batch_label)
     if self._output:
       for entry in xrange(len(softmax)):
         self._output.read_entry(entry)
@@ -268,7 +293,6 @@ class ssnet_trainval(object):
     self._input_main.next(store_entries   = (not self._cfg.TRAIN),
                           store_event_ids = (not self._cfg.TRAIN))
 
-
   def batch_process(self):
 
     # Run iterations
@@ -280,11 +304,14 @@ class ssnet_trainval(object):
       # Start IO thread for the next batch while we train the network
       if self._cfg.TRAIN:
         self.train_step()
-        
       else:
         self.ana_step()
 
-      self._iteration += 1
+  def iterations(self):
+    return self._cfg.ITERATIONS
+
+  def current_iteration(self):
+    return self._iteration
 
   def reset(self):
     if self._input_main:

@@ -29,7 +29,9 @@ class ssnet_config:
     KEYWORD_DATA      = 'data'
     KEYWORD_LABEL     = 'label'
     KEYWORD_WEIGHT    = 'weight'
-
+    KEYWORD_TEST_DATA   = ''
+    KEYWORD_TEST_LABEL  = ''
+    KEYWORD_TEST_WEIGHT = ''
     def __init__(self):
         pass
 
