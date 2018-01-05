@@ -123,7 +123,8 @@ class ssnet_trainval(object):
       if save_dir and not os.path.isdir(save_dir):
         os.makedirs(save_dir)
       # Create weights saver
-      self._saver = tf.train.Saver()
+      self._saver = tf.train.Saver(max_to_keep=self._cfg.CHECKPOINT_NMAX, 
+                                   keep_checkpoint_every_n_hours=self._cfg.CHECKPOINT_NHOUR)
       
     # Override variables if wished
     if self._cfg.LOAD_FILE:

@@ -23,9 +23,11 @@ class ssnet_config:
     TRAIN             = True
     DEBUG             = False
     USE_WEIGHTS       = True
-    CHECKPOINT_STEPS  = 200
-    SUMMARY_STEPS     = 20
     REPORT_STEPS      = 200
+    SUMMARY_STEPS     = 20
+    CHECKPOINT_STEPS  = 200
+    CHECKPOINT_NMAX   = 10
+    CHECKPOINT_NHOUR  = 0.4
     KEYWORD_DATA      = 'data'
     KEYWORD_LABEL     = 'label'
     KEYWORD_WEIGHT    = 'weight'
