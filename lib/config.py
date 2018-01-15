@@ -7,7 +7,7 @@ class ssnet_config:
 
     NUM_CLASS         = 3
     BASE_NUM_FILTERS  = 16
-    MAIN_INPUT_CONFIG = 'config/train_io.cfg'
+    MAIN_INPUT_CONFIG = 'config/input_train.cfg'
     TEST_INPUT_CONFIG = ''
     ANA_OUTPUT_CONFIG = ''
     LOGDIR            = 'ssnet_train_log'
