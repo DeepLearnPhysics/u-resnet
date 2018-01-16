@@ -29,10 +29,16 @@ class ssnet_trainval(object):
       self._freeze_all = self._freeze_all and self._cfg.FREEZE_VERTEX
 
   def __del__(self):
-    if self._filler:
-      self._filler.reset()
-    if self._drainer:
-      self._drainer.finalize()
+    try:
+      if self._filler:
+        self._filler.reset()
+    except AttributeError:
+      pass
+    try:
+      if self._drainer:
+        self._drainer.finalize()
+    except AttributeError:
+      pass
 
   def iteration_from_file_name(self,file_name):
     return int((file_name.split('-'))[-1])
@@ -182,6 +188,20 @@ class ssnet_trainval(object):
         self._iteration += 1
         self._report(self._iteration,np.mean(batch_metrics,axis=0),descr_metrics)
 
+        #max_head, min_head, mean_head, max_label, min_label, mean_label, max_right, min_right, mean_right = self._net.stats(sess = self._sess,
+        #                                                                                                                    input_data = minibatch_data,
+        #                                                                                                                    input_label = minibatch_vertex_label,
+        #                                                                                                                    input_weight = minibatch_vertex_weight)
+        stats_tup = self._net.stats(sess = sess,      
+                                     input_data = minibatch_data,
+                                    input_class_weight = minibatch_class_weight,
+                                    input_vertex_label = minibatch_vertex_label,                         
+                                    input_vertex_weight = minibatch_vertex_weight)
+        debug = 'maxhead %g, minhead %g, meanhead %g, maxlabel %g, minlabel %g, meanlabel %g, maxright %g, minright %g, meanright %g \n'
+        debug = debug % tuple([np.squeeze(s) for s in stats_tup])
+        sys.stdout.write(debug)
+        sys.stdout.flush()
+
         '''
         # Save log
         if self._cfg.SUMMARY_STEPS and ((self._iteration+1)%self._cfg.SUMMARY_STEPS) == 0:
@@ -279,7 +299,5 @@ class ssnet_trainval(object):
         self._filler.next(store_entries   = self._freeze_all,
                           store_event_ids = self._freeze_all)
 
-    self._filler.reset()
-    self._drainer.finalize()
     del self._filler
     #self._filler = None

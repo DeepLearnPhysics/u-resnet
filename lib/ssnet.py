@@ -128,6 +128,24 @@ class ssnet_base(object):
       self._vertex_accuracy_nonzero = None
       with tf.variable_scope('vertex_metrics'):
         self._vertex_prediction = tf.nn.sigmoid(x=head_vertex)
+        # evaluate sigmoid of label
+        self._label_prediction = tf.nn.sigmoid(x=vertex_label)
+        # head sigmoid monitoring
+        self._max_sigmoid_head = [tf.reduce_max(self._vertex_prediction)]
+        self._min_sigmoid_head = [tf.reduce_min(self._vertex_prediction)]
+        self._mean_sigmoid_head = [tf.reduce_mean(self._vertex_prediction)]
+        # label sigmoid monitoring
+        self._max_sigmoid_label = [tf.reduce_max(vertex_label)]
+        self._min_sigmoid_label = [tf.reduce_min(vertex_label)]
+        self._mean_sigmoid_label = [tf.reduce_mean(vertex_label)]
+        # head sigmoids where label prob > 0.5
+        #right_idx = tf.to_int64(self._label_prediction > tf.to_float(0.5))
+        right_idx = tf.where(tf.reshape(self._label_prediction, shape_dim[:-1])>tf.to_float(0.5))
+        right_pred = tf.gather_nd(self._vertex_prediction, right_idx)
+        self._max_right = [tf.reduce_max(right_pred)]
+        self._min_right = [tf.reduce_min(right_pred)]
+        self._mean_right = [tf.reduce_mean(right_pred)]
+
         vertex_score_threshold    = 0.5
         candidate_vertex_location = tf.to_int64(self._vertex_prediction  > tf.to_float(vertex_score_threshold))
         correct_vertex_location   = tf.to_int64(vertex_label > tf.to_float(vertex_score_threshold))
@@ -197,6 +215,16 @@ class ssnet_base(object):
       tf.summary.scalar('vertex accuracy', self._vertex_accuracy_allpix)
       tf.summary.scalar('vertex accuracy (nonzero)', self._vertex_accuracy_nonzero)
       if self._vertex_loss is not None: tf.summary.scalar('vertex loss', self._vertex_loss)
+
+  def stats(self,sess, input_data, input_class_weight, input_vertex_label, input_vertex_weight=None):
+    feed_dict = self.feed_dict(input_data = input_data,
+                               input_class_weight = input_class_weight,
+                               input_vertex_label = input_vertex_label,
+                               input_vertex_weight = input_vertex_weight)
+    return sess.run([self._max_sigmoid_head, self._min_sigmoid_head, self._mean_sigmoid_head,
+                     self._max_sigmoid_label, self._min_sigmoid_label, self._mean_sigmoid_label,
+                     self._max_right, self._min_right, self._mean_right], feed_dict = feed_dict)
+    
 
   def zero_gradients(self, sess):
     return sess.run([self._zero_gradients])
