@@ -320,15 +320,15 @@ class ssnet_trainval(object):
     return self._iteration
 
   def reset(self):
-    if self._input_main:
+    if hasattr(self, '_input_main') and self._input_main is not None:
       self._input_main.reset()
       self._input_main = None
 
-    if self._input_test:
+    if hasattr(self, '_input_test') and self._input_test is not None:
       self._input_test.reset()
       self._input_test = None
 
-    if self._output:
+    if hasattr(self, '_output') and self._output is not None:
       self._output.finalize()
       self._output = None
 
