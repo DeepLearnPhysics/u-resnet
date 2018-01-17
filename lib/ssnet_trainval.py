@@ -308,6 +308,11 @@ class ssnet_trainval(object):
       else:
         self.ana_step()
 
+  def merge_all_summaries(self):
+    # Update network's merged summary
+    if hasattr(self, '_net') and hasattr(self._net, '_merged_summary'):
+      self._net._merged_summary = tf.summary.merge_all()
+
   def iterations(self):
     return self._cfg.ITERATIONS
 
