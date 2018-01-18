@@ -47,6 +47,9 @@ class ssnet_trainval(object):
       print('Must provide larcv data filler configuration file!')
       return
 
+    # Set random seed for reproducibility
+    tf.set_random_seed(self._cfg.TF_RANDOM_SEED)
+
     #
     # Data IO configuration
     #
@@ -96,8 +99,6 @@ class ssnet_trainval(object):
     #
     # Network variable initialization
     #
-    # Set random seed for reproducibility
-    tf.set_random_seed(self._cfg.TF_RANDOM_SEED)
     # Configure global process (session, summary, etc.)
     # Initialize variables
     self._sess = tf.InteractiveSession()
