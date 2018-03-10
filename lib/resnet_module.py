@@ -28,7 +28,7 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
                                stride      = stride,
                                trainable   = trainable,
                                padding     = 'same',
-                               normalizer_fn = None, 
+                               normalizer_fn = slim.batch_norm, 
                                activation_fn = None,
                                scope       = 'shortcut')
         #
@@ -46,7 +46,7 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
                            stride      = stride,
                            trainable   = trainable,
                            padding     = 'same',
-                           normalizer_fn = None,
+                           normalizer_fn = slim.batch_norm,
                            activation_fn = None,
                            scope       = 'resnet_conv1')
         
@@ -61,7 +61,7 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
                            stride      = 1,
                            trainable   = trainable,
                            padding     = 'same',
-                           normalizer_fn = None,
+                           normalizer_fn = slim.batch_norm,
                            activation_fn = None,
                            scope       = 'resnet_conv2')
         

@@ -27,9 +27,10 @@ class ssnet_config:
     CHECKPOINT_STEPS  = 200
     SUMMARY_STEPS     = 20
     KEYWORD_DATA      = 'data'
-    KEYWORD_CLASS_LABEL  = 'label'
-    KEYWORD_CLASS_WEIGHT = 'weight'
-    KEYWORD_VERTEX_LABEL  = ''
+    KEYWORD_CLASS_LABEL  = 'class_label'
+    KEYWORD_CLASS_WEIGHT = 'class_weight'
+    KEYWORD_PRIMARY  = ''
+    KEYWORD_SECONDARY = ''
     KEYWORD_VERTEX_WEIGHT = ''
     PREDICT_VERTEX       = False
 

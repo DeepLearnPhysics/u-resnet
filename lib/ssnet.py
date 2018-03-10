@@ -72,7 +72,7 @@ class ssnet_base(object):
                                kernel_size = 3,
                                stride      = 1,
                                trainable   = not self._freeze_class,
-                               normalizer_fn = None,
+                               normalizer_fn = slim.batch_norm,
                                activation_fn = None,
                                scope       = 'segmentation')
     if self._debug: print(head_class.shape, 'after segmentation layer')
@@ -97,7 +97,7 @@ class ssnet_base(object):
                                   kernel_size = 3,
                                   stride      = 1,
                                   trainable   = not self._freeze_vertex,
-                                  normalizer_fn = None,
+                                  normalizer_fn = slim.batch_norm,
                                   activation_fn = tf.nn.relu,
                                   scope       = 'vertex_conv0')
       if self._debug: print(head_vertex.shape, 'after vertex_conv0 layer')
@@ -108,7 +108,7 @@ class ssnet_base(object):
                                   kernel_size = 3,
                                   stride      = 1,
                                   trainable   = not self._freeze_vertex,
-                                  normalizer_fn = None,
+                                  normalizer_fn = slim.batch_norm,
                                   activation_fn = tf.nn.relu,
                                   scope       = 'vertex_conv1')
       if self._debug: print(head_vertex.shape, 'after vertex_conv1 layer')
