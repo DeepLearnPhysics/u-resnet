@@ -144,9 +144,11 @@ class ssnet_trainval(object):
           self._net.zero_gradients(sess)
           minibatch_data   = self._filler.fetch_data(self._cfg.KEYWORD_DATA).data()
           minibatch_class_label   = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_LABEL).data()
+          print("HEREHRHERHERHE", np.max(minibatch_class_label))
           minibatch_class_weight  = None
           minibatch_vertex_label  = None
           minibatch_vertex_weight = None
+          minibatch_secondary = None
           if self._cfg.USE_WEIGHTS:
             minibatch_class_weight = self._filler.fetch_data(self._cfg.KEYWORD_CLASS_WEIGHT).data()
             # perform per-event normalization
@@ -154,8 +156,12 @@ class ssnet_trainval(object):
             minibatch_class_weight /= (np.sum(minibatch_class_weight,axis=1).reshape([minibatch_class_weight.shape[0],1]))
             #print( (minibatch_class_weight[0] > 0.).astype(np.int32).sum() )
           if self._cfg.PREDICT_VERTEX:
-            minibatch_vertex_label  = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_LABEL ).data()
+            minibatch_primary  = self._filler.fetch_data(self._cfg.KEYWORD_PRIMARY).data()
+            minibatch_secondary = self._filler.fetch_data(self._cfg.KEYWORD_SECONDARY).data()
             minibatch_vertex_weight = self._filler.fetch_data(self._cfg.KEYWORD_VERTEX_WEIGHT).data()
+            minibatch_primary[minibatch_primary != 1.] = 0.
+            minibatch_secondary[minibatch_secondary != 1.] = 0.
+            minibatch_vertex_label = np.maximum(minibatch_secondary, minibatch_primary)
             # perform per-event normalization
             #print(np.sum(minibatch_vertex_weight,axis=1))
             minibatch_vertex_weight /= (np.sum(minibatch_vertex_weight,axis=1).reshape([minibatch_vertex_weight.shape[0],1]))
@@ -197,9 +203,9 @@ class ssnet_trainval(object):
                                     input_class_weight = minibatch_class_weight,
                                     input_vertex_label = minibatch_vertex_label,                         
                                     input_vertex_weight = minibatch_vertex_weight)
-        debug = 'maxhead %g, minhead %g, meanhead %g, maxlabel %g, minlabel %g, meanlabel %g, maxright %g, minright %g, meanright %g \n'
-        debug = debug % tuple([np.squeeze(s) for s in stats_tup])
-        sys.stdout.write(debug)
+        #debug = 'maxhead %g, minhead %g, meanhead %g, maxlabel %g, minlabel %g, meanlabel %g, maxright %g, minright %g, meanright %g \n'
+        #debug = debug % tuple([np.squeeze(s) for s in stats_tup])
+        #sys.stdout.write(debug)
         sys.stdout.flush()
 
         '''

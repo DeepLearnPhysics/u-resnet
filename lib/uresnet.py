@@ -32,7 +32,7 @@ class uresnet(ssnet_base):
                                 kernel_size = 7,
                                 stride      = 1,
                                 trainable   = not self._freeze_base,
-                                normalizer_fn = None,
+                                normalizer_fn = slim.batch_norm,
                                 activation_fn = tf.nn.relu,
                                 padding     = 'same',
                                 scope       = 'conv0')
@@ -64,7 +64,8 @@ class uresnet(ssnet_base):
                                                   kernel_size = 3,
                                                   stride      = 2,
                                                   padding     = 'same',
-                                                  activation_fn = None,
+                                                  activation_fn = tf.nn.relu,
+                                                  normalizer_fn = slim.batch_norm,
                                                   trainable   = not self._freeze_base,
                                                   scope       = 'deconv%d' % step)
                 else:
@@ -73,7 +74,8 @@ class uresnet(ssnet_base):
                                                   kernel_size = 3,
                                                   stride      = 2,
                                                   padding     = 'same',
-                                                  activation_fn = None,
+                                                  activation_fn = tf.nn.relu,
+                                                  normalizer_fn = slim.batch_norm,
                                                   trainable   = not self._freeze_base,
                                                   scope       = 'deconv%d' % step,
                                                   biases_initializer = None)
@@ -97,7 +99,7 @@ class uresnet(ssnet_base):
                                 kernel_size = 7,
                                 stride      = 1,
                                 trainable   = not self._freeze_base,
-                                normalizer_fn = None,
+                                normalizer_fn = slim.batch_norm,
                                 activation_fn = tf.nn.relu,
                                 scope       = 'conv1')
             if self._debug: print(net.shape, 'after conv1')
