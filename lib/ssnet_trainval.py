@@ -188,18 +188,6 @@ class ssnet_trainval(object):
         self._iteration += 1
         self._report(self._iteration,np.mean(batch_metrics,axis=0),descr_metrics)
 
-        #max_head, min_head, mean_head, max_label, min_label, mean_label, max_right, min_right, mean_right = self._net.stats(sess = self._sess,
-        #                                                                                                                    input_data = minibatch_data,
-        #                                                                                                                    input_label = minibatch_vertex_label,
-        #                                                                                                                    input_weight = minibatch_vertex_weight)
-        stats_tup = self._net.stats(sess = sess,      
-                                     input_data = minibatch_data,
-                                    input_class_weight = minibatch_class_weight,
-                                    input_vertex_label = minibatch_vertex_label,                         
-                                    input_vertex_weight = minibatch_vertex_weight)
-        debug = 'maxhead %g, minhead %g, meanhead %g, maxlabel %g, minlabel %g, meanlabel %g, maxright %g, minright %g, meanright %g \n'
-        debug = debug % tuple([np.squeeze(s) for s in stats_tup])
-        sys.stdout.write(debug)
         sys.stdout.flush()
 
         '''
