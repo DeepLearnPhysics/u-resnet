@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 # Basic imports
-import os,sys,time
+import os,sys,time,datetime
 import numpy as np
 
 # Import more libraries (after configuration is validated)
@@ -151,7 +151,7 @@ class ssnet_trainval(object):
     self._iteration += 1
     report_step  = self._iteration % self._cfg.REPORT_STEPS == 0
     summary_step = self._cfg.SUMMARY_STEPS and (self._iteration % self._cfg.SUMMARY_STEPS) == 0
-    checkpt_step = self._cfg.CHECKPOINT_STEPS and (self._iteration % self._cfg.CHECKPOINT_STEPS) == 0
+    checkpt_step = self._cfg.CHECKPOINT_STEPS and self._iteration > 0 and (self._iteration % self._cfg.CHECKPOINT_STEPS) == 0
 
     # Nullify the gradients
     self._net.zero_gradients(self._sess)
@@ -196,6 +196,7 @@ class ssnet_trainval(object):
 
     # read-in test data set if needed
     (test_data, test_label, test_weight) = (None,None,None)
+
     if (report_step or summary_step) and self._input_test:
         self._input_test.next()
         test_data   = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_DATA).data()
@@ -208,7 +209,8 @@ class ssnet_trainval(object):
 
     # Report
     if report_step:
-      sys.stdout.write('@ iteration {:d} LR {:g}\n'.format(self._iteration, self._net._opt._lr))
+      tstamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+      sys.stdout.write('@ iteration {:d} LR {:g} @ {:s}\n'.format(self._iteration, self._net._opt._lr, tstamp))
       sys.stdout.write('Train set: ')
       self._report(np.mean(self._batch_metrics,axis=0),self._descr_metrics)
       if self._input_test:
