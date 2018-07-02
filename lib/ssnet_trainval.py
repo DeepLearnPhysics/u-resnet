@@ -101,7 +101,8 @@ class ssnet_trainval(object):
     #
     # Configure global process (session, summary, etc.)
     # Initialize variables
-    self._sess = tf.InteractiveSession()
+    #self._sess = tf.InteractiveSession()
+    self._sess = tf.Session()
     self._sess.run(tf.global_variables_initializer())
     self._writer_train = None
     self._writer_test = None
@@ -141,8 +142,7 @@ class ssnet_trainval(object):
         vlist.append(v)
       reader=tf.train.Saver(var_list=vlist)
       reader.restore(self._sess,self._cfg.LOAD_FILE)
-    
-    self._iteration = 0
+    #self._iteration = 0
     self._batch_metrics = None
     self._descr_metrics = None
 
@@ -253,18 +253,16 @@ class ssnet_trainval(object):
     softmax,acc_all,acc_nonzero = self.ana(input_data  = batch_data,
                                            input_label = batch_label)
     if self._output:
-      for entry in xrange(len(softmax)):
-        self._output.read_entry(entry)
-        data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
-        entries   = self._input_main.fetch_entries()
-        event_ids = self._input_main.fetch_event_ids()
+      entries   = self._input_main.fetch_entries()
+      event_ids = self._input_main.fetch_event_ids()
 
       for entry in xrange(len(softmax)):
+        print('Entry',entries[entry],'Acc',acc_nonzero)
         self._output.read_entry(entries[entry])
         data  = np.array(batch_data[entry]).reshape(softmax.shape[1:-1])
         label = np.array(batch_label[entry]).reshape(softmax.shape[1:-1])
-
         shower_score, track_score = (None,None)
+        
         data_2d = len(softmax.shape) == 4
         # 3D case
         if data_2d:
@@ -273,25 +271,30 @@ class ssnet_trainval(object):
         else:
           shower_score = softmax[entry,:,:,:,1]
           track_score  = softmax[entry,:,:,:,2]
-        
-        sum_score = shower_score + track_score
-        shower_score = shower_score / sum_score
-        track_score  = track_score  / sum_score
+
+        #sum_score = shower_score + track_score
+        #mask = np.where(data>0)
+        #shower_score[mask] = shower_score[mask] / sum_score[mask]
+        #track_score[mask]  = track_score[mask]  / sum_score[mask]
         
         ssnet_result = (shower_score > track_score).astype(np.float32) + (track_score >= shower_score).astype(np.float32) * 2.0
         nonzero_map  = (data > 1.0).astype(np.int32)
         ssnet_result = (ssnet_result * nonzero_map).astype(np.float32)
 
+        myindex = np.where(label>0.)
+        #print(myindex)
+        #print(ssnet_result[myindex])
+        #print(data[myindex])
         if data_2d:
-          larcv_data = self._output.get_data("image2d","data")
+          larcv_data = self._output.get_data("image2d","data"  )
           larcv_out  = self._output.get_data("sparse2d","ssnet")
           vs = larcv.as_image2d(ssnet_result)
-          sparse3d.set(vs,data.meta())
+          larcv_out.set(vs,larcv_data.meta())
         else:
-          larcv_data = self._output.get_data("sparse3d","data")
+          larcv_data = self._output.get_data("sparse3d","data" )
           larcv_out  = self._output.get_data("sparse3d","ssnet")
           vs = larcv.as_tensor3d(ssnet_result)
-          sparse3d.set(vs,data.meta())
+          larcv_out.set(vs,larcv_data.meta())
         self._output.save_entry()
 
     self._input_main.next(store_entries   = (not self._cfg.TRAIN),
