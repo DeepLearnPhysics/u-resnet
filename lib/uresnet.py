@@ -36,7 +36,7 @@ class uresnet(ssnet_base):
             # assume zero padding in each layer (set as default in uresnet_layers.py)
             net = fn_conv(inputs      = input_tensor,
                           num_outputs = self._base_num_outputs,
-                          kernel_size = 7,
+                          kernel_size = 3,
                           stride      = 1,
                           trainable   = self._trainable,
                           normalizer_fn = slim.batch_norm,
@@ -103,7 +103,7 @@ class uresnet(ssnet_base):
             net = fn_conv(inputs      = net,
                           num_outputs = self._base_num_outputs,
                           padding     = 'same',
-                          kernel_size = 7,
+                          kernel_size = 3,
                           stride      = 1,
                           trainable   = self._trainable,
                           normalizer_fn = slim.batch_norm,
