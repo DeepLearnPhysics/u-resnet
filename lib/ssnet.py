@@ -72,13 +72,13 @@ class ssnet_base(object):
         #self._train = tf.train.AdamOptimizer().minimize(self._loss)
         self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
         if self._learning_rate <= 0:
-          self._opt = tf.train.AdamOptimizer()
+          opt = tf.train.AdamOptimizer()
         else:
-          self._opt = tf.train.AdamOptimizer(self._learning_rate)
+          opt = tf.train.AdamOptimizer(self._learning_rate)
         self._zero_gradients = [tv.assign(tf.zeros_like(tv)) for tv in self._accum_vars]
         self._accum_gradients = [self._accum_vars[i].assign_add(gv[0]) for
-                                 i, gv in enumerate(self._opt.compute_gradients(self._loss))]
-        self._apply_gradients = self._opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
+                                 i, gv in enumerate(opt.compute_gradients(self._loss))]
+        self._apply_gradients = opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
 
       if len(self._dims) == 3:
         tf.summary.image('data_example',tf.image.grayscale_to_rgb(data,'gray_to_rgb'),10)
