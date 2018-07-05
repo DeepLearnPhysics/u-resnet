@@ -86,7 +86,7 @@ class ssnet_trainval(object):
     self._net = uresnet(dims=dim_data[1:],
                         num_class=3, 
                         base_num_outputs=self._cfg.BASE_NUM_FILTERS, 
-                        debug=False)
+                        debug=self._cfg.DEBUG)
 
     if self._cfg.TRAIN:
       self._net.construct(trainable=self._cfg.TRAIN,
@@ -182,17 +182,6 @@ class ssnet_trainval(object):
 
     # update
     self._net.apply_gradients(self._sess)
-
-    # debug output
-    if self._cfg.DEBUG:
-      maxval, minval, meanval = self._net.stats(sess = self._sess, 
-                                                input_data = minibatch_data,
-                                                input_label = minibatch_label,
-                                                input_weight = minibatch_weight)
-      debug = 'max %g, min %g, mean %g \n'
-      debug = debug % (np.squeeze(maxval), np.squeeze(minval), np.squeeze(meanval))
-      sys.stdout.write(debug)
-      sys.stdout.flush()
 
     # read-in test data set if needed
     (test_data, test_label, test_weight) = (None,None,None)

@@ -47,9 +47,6 @@ class ssnet_base(object):
     self._accuracy_allpix = None
     self._accuracy_nonzero = None
 
-    self._max = [tf.reduce_max(net)]
-    self._min = [tf.reduce_min(net)]
-    self._mean = [tf.reduce_mean(net)]
     #self._meanvar = [tf.nn.moments(net, axes=[1])]
 
     with tf.variable_scope('accum_grad'):
@@ -98,13 +95,6 @@ class ssnet_base(object):
 
     return sess.run(self._merged_summary,feed_dict=feed_dict)
 
-  def stats(self, sess, input_data, input_label, input_weight=None):
-    feed_dict = self.feed_dict(input_data = input_data, 
-                               input_label = input_label,
-                               input_weight = input_weight)
-
-    return sess.run([self._max, self._min, self._mean], feed_dict = feed_dict)
-
   def zero_gradients(self, sess):
 
     return sess.run([self._zero_gradients])
@@ -146,13 +136,6 @@ class ssnet_base(object):
       ops.append(self._accuracy_nonzero)
 
     return sess.run( ops, feed_dict = feed_dict )
-
-  def stats(self, sess, input_data, input_label, input_weight=None):
-
-    feed_dict = self.feed_dict(input_data = input_data,
-                               input_label = input_label,
-                               input_weight = input_weight)
-    return sess.run([self._max, self._min, self._mean], feed_dict=feed_dict)
 
   def feed_dict(self,input_data,input_label=None,input_weight=None):
 
