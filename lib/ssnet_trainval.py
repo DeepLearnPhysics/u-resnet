@@ -231,7 +231,7 @@ class ssnet_trainval(object):
                                 input_data  = input_data,
                                 input_label = input_label)    
 
-  def ana_step(self):
+  def ana_step(self,batch_mode=False):
     
     self._iteration += 1
 
@@ -241,6 +241,12 @@ class ssnet_trainval(object):
     batch_weight = None
     softmax,acc_all,acc_nonzero = self.ana(input_data  = batch_data,
                                            input_label = batch_label)
+
+    copy_data, copy_label = (None,None)
+    if not batch_mode:
+      copy_data  = np.array(batch_data)
+      copy_label = np.array(batch_label)
+
     if self._output:
       entries   = self._input_main.fetch_entries()
       event_ids = self._input_main.fetch_event_ids()
@@ -275,8 +281,8 @@ class ssnet_trainval(object):
         #print(ssnet_result[myindex])
         #print(data[myindex])
         if data_2d:
-          larcv_data = self._output.get_data("image2d","data"  )
-          larcv_out  = self._output.get_data("image2d","ssnet")
+          larcv_data    = self._output.get_data("image2d","data"  )
+          larcv_out     = self._output.get_data("image2d","ssnet")
           img = larcv.as_image2d_meta(ssnet_result,larcv_data.as_vector().front().meta())
           larcv_out.append(img)
         else:
@@ -288,6 +294,13 @@ class ssnet_trainval(object):
 
     self._input_main.next(store_entries   = (not self._cfg.TRAIN),
                           store_event_ids = (not self._cfg.TRAIN))
+
+    if not batch_mode:
+      return {'input'   : copy_data,
+              'label'   : copy_label,
+              'softmax' : softmax,
+              'acc_all' : acc_all,
+              'acc_nonzero' : acc_nonzero}
 
   def batch_process(self):
 
@@ -301,7 +314,7 @@ class ssnet_trainval(object):
       if self._cfg.TRAIN:
         self.train_step()
       else:
-        self.ana_step()
+        self.ana_step(batch_mode=True)
 
   def merge_all_summaries(self):
     # Update network's merged summary
