@@ -276,9 +276,9 @@ class ssnet_trainval(object):
         #print(data[myindex])
         if data_2d:
           larcv_data = self._output.get_data("image2d","data"  )
-          larcv_out  = self._output.get_data("sparse2d","ssnet")
-          vs = larcv.as_image2d(ssnet_result)
-          larcv_out.set(vs,larcv_data.meta())
+          larcv_out  = self._output.get_data("image2d","ssnet")
+          img = larcv.as_image2d_meta(ssnet_result,larcv_data.as_vector().front().meta())
+          larcv_out.append(img)
         else:
           larcv_data = self._output.get_data("sparse3d","data" )
           larcv_out  = self._output.get_data("sparse3d","ssnet")
