@@ -34,6 +34,9 @@ class ssnet_trainval(object):
     sys.stdout.write(msg)
     sys.stdout.flush()
 
+  def num_class(self):
+    return self._cfg.NUM_CLASS
+
   def iteration_from_file_name(self,file_name):
     return int((file_name.split('-'))[-1])
 
@@ -84,7 +87,7 @@ class ssnet_trainval(object):
     dim_data = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).dim()
     dims = []
     self._net = uresnet(dims=dim_data[1:],
-                        num_class=3, 
+                        num_class=self._cfg.NUM_CLASS, 
                         base_num_outputs=self._cfg.BASE_NUM_FILTERS, 
                         debug=self._cfg.DEBUG)
 
@@ -242,10 +245,13 @@ class ssnet_trainval(object):
     softmax,acc_all,acc_nonzero = self.ana(input_data  = batch_data,
                                            input_label = batch_label)
 
-    copy_data, copy_label = (None,None)
+    copy_data, copy_label, copy_entries = (None,None,None)
     if not batch_mode:
-      copy_data  = np.array(batch_data)
-      copy_label = np.array(batch_label)
+      img_shape     = list(softmax.shape)
+      img_shape[-1] = -1
+      copy_data     = np.array(batch_data).reshape(img_shape)
+      copy_label    = np.array(batch_label).reshape(img_shape)
+      copy_entries  = np.array(self._input_main.fetch_entries())
 
     if self._output:
       entries   = self._input_main.fetch_entries()
@@ -296,7 +302,8 @@ class ssnet_trainval(object):
                           store_event_ids = (not self._cfg.TRAIN))
 
     if not batch_mode:
-      return {'input'   : copy_data,
+      return {'entries' : copy_entries,
+              'input'   : copy_data,
               'label'   : copy_label,
               'softmax' : softmax,
               'acc_all' : acc_all,
