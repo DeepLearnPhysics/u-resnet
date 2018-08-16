@@ -86,9 +86,19 @@ class uresnet(ssnet_base):
                                             trainable   = self._trainable,
                                             scope       = 'deconv%d' % step,
                                             biases_initializer = None)
-
                 if self._debug: print(net.shape, 'after deconv%d' % step)
-                net = tf.concat([net, conv_feature_map[num_outputs]],
+                
+                shortcut = fn_conv(inputs      = conv_feature_map[num_outputs],
+                                   num_outputs = num_outputs,
+                                   kernel_size = 1,
+                                   stride      = 1,
+                                   trainable   = self._trainable,
+                                   normalizer_fn = slim.batch_norm,
+                                   activation_fn = tf.nn.relu,
+                                   padding     = 'same',
+                                   scope       = 'uconv%d' % step)
+                if self._debug: print(shortcut.shape, 'after uconv%d' % step)
+                net = tf.concat([net, shortcut],
                                 axis=len(net.shape)-1, 
                                 name='concat%d' % step)
                 if self._debug: print(net.shape, 'after concat%d' % step)
