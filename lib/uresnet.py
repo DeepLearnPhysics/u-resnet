@@ -88,10 +88,8 @@ class uresnet(ssnet_base):
                                             biases_initializer = None)
 
                 if self._debug: print(net.shape, 'after deconv%d' % step)
-                net = tf.concat([net, conv_feature_map[num_outputs]],
-                                axis=len(net.shape)-1, 
-                                name='concat%d' % step)
-                if self._debug: print(net.shape, 'after concat%d' % step)
+                net = net + conv_feature_map[num_outputs]
+                if self._debug: print(net.shape, 'after add%d' % step)
                 net = double_resnet(input_tensor = net, 
                                     num_outputs  = num_outputs,
                                     trainable    = self._trainable,
