@@ -86,19 +86,26 @@ class uresnet(ssnet_base):
                                             trainable   = self._trainable,
                                             scope       = 'deconv%d' % step,
                                             biases_initializer = None)
-
                 if self._debug: print(net.shape, 'after deconv%d' % step)
-                net = tf.concat([net, conv_feature_map[num_outputs]],
-                                axis=len(net.shape)-1, 
-                                name='concat%d' % step)
-                if self._debug: print(net.shape, 'after concat%d' % step)
+
                 net = double_resnet(input_tensor = net, 
                                     num_outputs  = num_outputs,
                                     trainable    = self._trainable,
                                     kernel       = 3,
                                     stride       = 1,
-                                    scope        = 'resnet_module%d' % (step+5))
-                if self._debug: print(net.shape, 'after resnet_module%d' % (step + self._num_strides))
+                                    scope        = 'resnet_module%d' % (2*step+self._num_strides))
+                if self._debug: print(net.shape, 'after resnet_module%d' % (2*step + self._num_strides))
+                net = tf.concat([net, conv_feature_map[num_outputs]],
+                                axis=len(net.shape)-1, 
+                                name='concat%d' % step)
+                if self._debug: print(net.shape, 'after concat%d' % step)
+                net = double_resnet(input_tensor = net,
+                                    num_outputs  = num_outputs,
+                                    trainable    = self._trainable,
+                                    kernel       = 3,
+                                    stride       = 1,
+                                    scope        = 'resnet_module%d' % (2*step+self._num_strides+1))
+                if self._debug: print(net.shape, 'after resnet_module%d' % (2*step + self._num_strides + 1))
             # Final conv layers
             net = fn_conv(inputs      = net,
                           num_outputs = self._base_num_outputs,
