@@ -21,6 +21,7 @@ class ssnet_trainval(object):
     self._input_test = None
     self._output     = None
     self._iteration  = -1
+    self._sess       = None
 
   def __del__(self):
     self.reset()
@@ -43,6 +44,9 @@ class ssnet_trainval(object):
   def override_config(self,file_name):
     self._cfg.override(file_name)
     self._cfg.dump()
+
+  def report_memory(self):
+    return self._sess.run(tf.contrib.memory_stats.MaxBytesInUse())
 
   def initialize(self):
     # Instantiate and configure
@@ -202,7 +206,7 @@ class ssnet_trainval(object):
     # Report
     if report_step:
       tstamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-      sys.stdout.write('@ iteration {:d} LR {:g} @ {:s}\n'.format(self._iteration, self._net._opt._lr, tstamp))
+      sys.stdout.write('@ iteration {:d} LR {:g} Mem {:g} @ {:s}\n'.format(self._iteration, self._net._opt._lr, self.report_memory(), tstamp))
       sys.stdout.write('Train set: ')
       self._report(np.mean(self._batch_metrics,axis=0),self._descr_metrics)
       if self._input_test:
