@@ -158,7 +158,7 @@ class ssnet_trainval(object):
     self._iteration += 1
     report_step  = self._iteration % self._cfg.REPORT_STEPS == 0
     summary_step = self._cfg.SUMMARY_STEPS and (self._iteration % self._cfg.SUMMARY_STEPS) == 0
-    checkpt_step = self._cfg.CHECKPOINT_STEPS and self._iteration > 0 and (self._iteration % self._cfg.CHECKPOINT_STEPS) == 0
+    checkpt_step = self._cfg.CHECKPOINT_STEPS and ((self._iteration+1) % self._cfg.CHECKPOINT_STEPS) == 0
 
     # Nullify the gradients
     self._net.zero_gradients(self._sess)
