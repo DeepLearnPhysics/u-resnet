@@ -41,13 +41,23 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
         #                        scope      = 'resnet_bn1',
         #                        trainable  = trainable)
         residual = fn_conv(inputs      = residual,
-                           num_outputs = num_outputs,
+                           num_outputs = num_outputs/4,
+                           kernel_size = 1,
+                           stride      = 1,
+                           trainable   = trainable,
+                           padding     = 'same',
+                           normalizer_fn = slim.batch_norm,
+                           activation_fn = tf.nn.relu,
+                           scope       = 'resnet_conv1')
+
+        residual = fn_conv(inputs      = residual,
+                           num_outputs = num_outputs/4,
                            kernel_size = kernel,
                            stride      = stride,
                            trainable   = trainable,
                            padding     = 'same',
                            normalizer_fn = slim.batch_norm,
-                           activation_fn = None,
+                           activation_fn = tf.nn.relu,
                            scope       = 'resnet_conv1')
         
         #residual = L.batch_norm(inputs     = residual, 
@@ -57,7 +67,7 @@ def resnet_module(input_tensor, num_outputs, trainable=True, kernel=(3,3), strid
         #                        trainable  = trainable)
         residual = fn_conv(inputs      = residual,
                            num_outputs = num_outputs,
-                           kernel_size = kernel,
+                           kernel_size = 1,
                            stride      = 1,
                            trainable   = trainable,
                            padding     = 'same',
