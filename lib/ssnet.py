@@ -23,12 +23,13 @@ class ssnet_base(object):
     self._use_weight = bool(use_weight)
     self._learning_rate = learning_rate
 
-    entry_size = np.prod(self._dims)
+    data_size  = np.prod(self._dims)
+    label_size = np.prod(self._dims[:-1])
 
     with tf.variable_scope('input_prep'):
-      self._input_data   = tf.placeholder(tf.float32, [None, entry_size], name='input_data'  )
-      self._input_weight = tf.placeholder(tf.float32, [None, entry_size], name='input_weight')
-      self._input_label  = tf.placeholder(tf.float32, [None, entry_size], name='input_label' )
+      self._input_data   = tf.placeholder(tf.float32, [None, data_size ], name='input_data'  )
+      self._input_weight = tf.placeholder(tf.float32, [None, label_size], name='input_weight')
+      self._input_label  = tf.placeholder(tf.float32, [None, label_size], name='input_label' )
       
       shape_dim = np.insert(self._dims, 0, -1)
 
@@ -67,7 +68,7 @@ class ssnet_base(object):
         if self._use_weight:
           self._loss = tf.multiply(weight,self._loss)
         #self._train = tf.train.AdamOptimizer().minimize(self._loss)
-        self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(entry_size / self._dims[-1])]),axis=1))
+        self._loss = tf.reduce_mean(tf.reduce_sum(tf.reshape(self._loss,[-1, int(label_size)]),axis=1))
         if self._learning_rate <= 0:
           self._opt = tf.train.AdamOptimizer()
         else:
