@@ -78,7 +78,7 @@ class ssnet_base(object):
                                  i, gv in enumerate(self._opt.compute_gradients(self._loss))]
         self._apply_gradients = self._opt.apply_gradients(zip(self._accum_vars, tf.trainable_variables()))
 
-      if len(self._dims) == 3:
+      if len(self._dims) == 3 and self._dims[-1] == 1:
         tf.summary.image('data_example',tf.image.grayscale_to_rgb(data,'gray_to_rgb'),10)
 
       tf.summary.scalar('accuracy_all', self._accuracy_allpix)
