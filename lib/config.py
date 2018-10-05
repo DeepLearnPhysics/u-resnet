@@ -11,6 +11,7 @@ class ssnet_config:
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
     INPUT_FILE        = 'aho.hdf5'
+    DATA_DIM          = ''
     AVOID_LOAD_PARAMS = []
     LEARNING_RATE     = -1
     MINIBATCH_SIZE    = 10

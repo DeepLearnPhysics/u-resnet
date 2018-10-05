@@ -7,6 +7,7 @@ class IOFLAGS:
     IO_TYPE    = 'h5'
     BATCH_SIZE = 1
     INPUT_FILE = ''
+    DATA_DIM   = ''
 class io_base(object):
 
     def __init__(self,flags):
@@ -44,29 +45,34 @@ class io_h5(io_base):
         import h5py as h5
         self._data  = None
         self._label = None
-        for f in self._flags.INPUT_FILE:
+        files = self._flags.INPUT_FILE.split(',')
+        for f in files:
+            print(f)
             f = h5.File(f,'r')
             if self._data is None:
-                self._data  = np.array(f['raw' ])
-                self._label = np.array(f['onehot'])
+                self._data  = np.array(f['raw' ]).astype(np.float32)
+                self._label = np.array(f['onehot']).astype(np.float32)
             else:
                 self._data  = np.concatenate(self._data, np.array(f['raw' ]))
                 self._label = np.concatenate(self._label,np.array(f['onehot']))
         self._num_entries = len(self._data)
 
-    #def next(self):
-    #    idx = np.arange(self.num_entries())
-    #    np.random.shuffle(idx)
-    #    idx = idx[0:self.batch_size()]
-    #    return self._data[idx, ...], self._label[idx, ...], idx
     def next(self):
-        import numpy as np
-        return (np.zeros(shape=[self._flags.BATCH_SIZE,32*32*32],dtype=np.float32),
-                np.zeros(shape=[self._flags.BATCH_SIZE,32*32*32],dtype=np.float32),
-                np.arange(0,self._flags.BATCH_SIZE,1))
+        idx = np.arange(self.num_entries())
+        np.random.shuffle(idx)
+        idx = idx[0:self.batch_size()]
+        return self._data[idx, ...], self._label[idx, ...], idx
+    #def next(self):
+    #    import numpy as np
+    #    return (np.zeros(shape=[self._flags.BATCH_SIZE,32*32*32],dtype=np.float32),
+    #            np.zeros(shape=[self._flags.BATCH_SIZE,32*32*32],dtype=np.float32),
+    #            np.arange(0,self._flags.BATCH_SIZE,1))
 
     def dim_data(self):
-        return (self._flags.BATCH_SIZE,32,32,32,1)
+        dim = None
+        exec('dim = list(%s)' % self._flags.DATA_DIM)
+        dim.insert(0,self._flags.BATCH_SIZE)
+        return dim
     
     def finalize(self):
         pass

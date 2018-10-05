@@ -63,7 +63,9 @@ class ssnet_trainval(object):
     io_flag.IO_TYPE    = 'h5'
     io_flag.BATCH_SIZE = self._cfg.MINIBATCH_SIZE
     io_flag.INPUT_FILE = self._cfg.INPUT_FILE
+    io_flag.DATA_DIM   = self._cfg.DATA_DIM
     self._input_main = io_factory(io_flag)
+    self._input_main.initialize()
     #self._input_main.configure()
 
     #
