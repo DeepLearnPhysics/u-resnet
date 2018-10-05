@@ -1,3 +1,5 @@
+*.hdf
+*.hdf5
 *.csv
 *log*
 *.out

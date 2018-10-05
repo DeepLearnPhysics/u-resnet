@@ -9,10 +9,8 @@ import numpy as np
 # Import more libraries (after configuration is validated)
 import tensorflow as tf
 from uresnet import uresnet
-from larcv import larcv
-from larcv.dataloader2 import larcv_threadio
-from config import ssnet_config
-
+from config  import ssnet_config
+from iotool import IOFLAGS, io_factory
 class ssnet_trainval(object):
 
   def __init__(self):
@@ -50,9 +48,9 @@ class ssnet_trainval(object):
 
   def initialize(self):
     # Instantiate and configure
-    if not self._cfg.MAIN_INPUT_CONFIG:
-      print('Must provide larcv data filler configuration file!')
-      return
+    #if not self._cfg.MAIN_INPUT_CONFIG:
+    #  print('Must provide larcv data filler configuration file!')
+    #  return
 
     # Set random seed for reproducibility
     tf.set_random_seed(self._cfg.TF_RANDOM_SEED)
@@ -61,34 +59,19 @@ class ssnet_trainval(object):
     # Data IO configuration
     #
     # Main input stream
-    self._input_main = larcv_threadio()
-    filler_cfg = {'filler_name' : 'MainIO',
-                  'verbosity'   : 0, 
-                  'filler_cfg'  : self._cfg.MAIN_INPUT_CONFIG}
-    self._input_main.configure(filler_cfg)
-    self._input_main.start_manager(self._cfg.MINIBATCH_SIZE)
-
-    # Test input stream (optional)
-    if self._cfg.TEST_INPUT_CONFIG:
-      self._input_test = larcv_threadio()
-      filler_cfg = {'filler_name' : 'TestIO',
-                    'verbosity'   : 0,
-                    'filler_cfg'  : self._cfg.TEST_INPUT_CONFIG}
-      self._input_test.configure(filler_cfg)
-      self._input_test.start_manager(self._cfg.TEST_BATCH_SIZE)
-
-    # Output stream (optional)
-    if self._cfg.ANA_OUTPUT_CONFIG:
-      self._output = larcv.IOManager(self._cfg.ANA_OUTPUT_CONFIG)
-      self._output.initialize()
+    io_flag = IOFLAGS()
+    io_flag.IO_TYPE    = 'h5'
+    io_flag.BATCH_SIZE = self._cfg.MINIBATCH_SIZE
+    io_flag.INPUT_FILE = self._cfg.INPUT_FILE
+    self._input_main = io_factory(io_flag)
+    #self._input_main.configure()
 
     #
     # Network construction
     #
     # Retrieve image/label dimensions
-    self._input_main.next(store_entries   = (not self._cfg.TRAIN),
-                      store_event_ids = (not self._cfg.TRAIN))
-    dim_data = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).dim()
+    data = self._input_main.next()
+    dim_data = self._input_main.dim_data()
     dims = []
     self._net = uresnet(dims=dim_data[1:],
                         num_class=self._cfg.NUM_CLASS, 
@@ -120,12 +103,6 @@ class ssnet_trainval(object):
       # Create a summary writer handle
       self._writer_train=tf.summary.FileWriter(logdir)
       self._writer_train.add_graph(self._sess.graph)
-      if self._input_test:
-        logdir = os.path.join(self._cfg.LOGDIR,'test')
-        if not os.path.isdir(logdir):
-          os.makedirs(logdir)
-        self._writer_test=tf.summary.FileWriter(logdir)
-        self._writer_test.add_graph(self._sess.graph)
     saver = None
     if self._cfg.SAVE_FILE:
       save_dir = self._cfg.SAVE_FILE[0:self._cfg.SAVE_FILE.rfind('/')]
@@ -164,11 +141,12 @@ class ssnet_trainval(object):
     self._net.zero_gradients(self._sess)
     # Loop over minibatches
     for j in xrange(self._cfg.NUM_MINIBATCHES):
-      minibatch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
-      minibatch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
+      data = self._input_main.next()
+      minibatch_data  = data[0]
+      minibatch_label = data[1]
       minibatch_weight = None
       if self._cfg.USE_WEIGHTS:
-        minibatch_weight = self._input_main.fetch_data(self._cfg.KEYWORD_WEIGHT).data()
+        minibatch_weight = data[2]
         # perform per-event normalization
         minibatch_weight /= (np.sum(minibatch_weight,axis=1).reshape([minibatch_weight.shape[0],1]))
 
@@ -184,24 +162,11 @@ class ssnet_trainval(object):
 
       self._batch_metrics[j,:] = res[1:]
 
-      self._input_main.next(store_entries   = (not self._cfg.TRAIN),
-                            store_event_ids = (not self._cfg.TRAIN))
-
     # update
     self._net.apply_gradients(self._sess)
 
     # read-in test data set if needed
     (test_data, test_label, test_weight) = (None,None,None)
-
-    if (report_step or summary_step) and self._input_test:
-        self._input_test.next()
-        test_data   = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_DATA).data()
-        test_label  = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_LABEL).data()
-        test_weight = None
-        if self._cfg.USE_WEIGHTS:
-          test_weight = self._input_test.fetch_data(self._cfg.KEYWORD_TEST_WEIGHT).data()
-          # perform per-event normalization
-          test_weight /= (np.sum(test_weight,axis=1).reshape([test_weight.shape[0],1]))      
 
     # Report
     if report_step:
@@ -209,10 +174,6 @@ class ssnet_trainval(object):
       sys.stdout.write('@ iteration {:d} LR {:g} Mem {:g} @ {:s}\n'.format(self._iteration, self._net._opt._lr, self.report_memory(), tstamp))
       sys.stdout.write('Train set: ')
       self._report(np.mean(self._batch_metrics,axis=0),self._descr_metrics)
-      if self._input_test:
-        res,doc = self._net.run_test(self._sess, test_data, test_label, test_weight)
-        sys.stdout.write('Test set: ')
-        self._report(res,doc)
 
     # Save log
     if summary_step:
@@ -241,7 +202,7 @@ class ssnet_trainval(object):
   def ana_step(self,batch_mode=False):
     
     self._iteration += 1
-
+    raise NotImplementedError
     # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
     batch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
     batch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
@@ -340,7 +301,8 @@ class ssnet_trainval(object):
 
   def reset(self):
     if hasattr(self, '_input_main') and self._input_main is not None:
-      self._input_main.reset()
+      #self._input_main.reset()
+      self._input_main.finalize()
       self._input_main = None
 
     if hasattr(self, '_input_test') and self._input_test is not None:

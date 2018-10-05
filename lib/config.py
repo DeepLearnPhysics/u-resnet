@@ -7,17 +7,14 @@ class ssnet_config:
 
     NUM_CLASS         = 3
     BASE_NUM_FILTERS  = 16
-    MAIN_INPUT_CONFIG = 'config/input_train.cfg'
-    TEST_INPUT_CONFIG = ''
-    ANA_OUTPUT_CONFIG = ''
     LOGDIR            = 'ssnet_train_log'
     SAVE_FILE         = 'ssnet_checkpoint/uresnet'
     LOAD_FILE         = ''
+    INPUT_FILE        = 'aho.hdf5'
     AVOID_LOAD_PARAMS = []
     LEARNING_RATE     = -1
     MINIBATCH_SIZE    = 10
     NUM_MINIBATCHES   = 5
-    TEST_BATCH_SIZE   = 10
     ITERATIONS        = 100000
     TF_RANDOM_SEED    = 1234
     TRAIN             = True
@@ -28,12 +25,6 @@ class ssnet_config:
     CHECKPOINT_STEPS  = 200
     CHECKPOINT_NMAX   = 10
     CHECKPOINT_NHOUR  = 0.4
-    KEYWORD_DATA      = 'data'
-    KEYWORD_LABEL     = 'label'
-    KEYWORD_WEIGHT    = 'weight'
-    KEYWORD_TEST_DATA   = ''
-    KEYWORD_TEST_LABEL  = ''
-    KEYWORD_TEST_WEIGHT = ''
     def __init__(self):
         pass
 
