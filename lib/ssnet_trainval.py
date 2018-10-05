@@ -204,14 +204,17 @@ class ssnet_trainval(object):
   def ana_step(self,batch_mode=False):
     
     self._iteration += 1
-    raise NotImplementedError
-    # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)                                  
-    batch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
-    batch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
-    batch_weight = None
+
+    # Receive data (this will hang if IO thread is still running = this will wait for thread to finish & receive data)
+    data = self._input_main.next()
+    batch_data  = data[0]
+    batch_label = data[1]
+    #batch_data   = self._input_main.fetch_data(self._cfg.KEYWORD_DATA).data()
+    #batch_label  = self._input_main.fetch_data(self._cfg.KEYWORD_LABEL).data()
     softmax,acc_all,acc_nonzero = self.ana(input_data  = batch_data,
                                            input_label = batch_label)
-
+    return softmax,acc_all,acc_nonzero
+    raise NotImplementedError
     copy_data, copy_label, copy_entries = (None,None,None)
     if not batch_mode:
       img_shape     = list(softmax.shape)
